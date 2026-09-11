@@ -25,12 +25,10 @@ npm install
 
 ## Before your first real build — things I need from you
 
-1. **GitHub repo for releases.** `src-tauri/tauri.conf.json` → `plugins.updater.endpoints`
-   currently has a placeholder:
-   `https://github.com/REPLACE_OWNER/REPLACE_REPO/releases/latest/download/latest.json`
-   Replace `REPLACE_OWNER/REPLACE_REPO` with the actual GitHub repo you'll
-   publish releases to (can be a new repo just for this, or reuse an existing
-   one — it doesn't have to contain code, releases just need to live there).
+1. ~~GitHub repo for releases.~~ Done — `src-tauri/tauri.conf.json` →
+   `plugins.updater.endpoints` points at
+   `https://github.com/alphariccide008/9nerz-desktop/releases/latest/download/latest.json`
+   (this repo, public).
 
 2. **Signing keypair.** The updater requires every release to be signed.
    Generate it once:
