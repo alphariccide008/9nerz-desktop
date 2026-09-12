@@ -115,7 +115,7 @@ export default function TicketsIndex() {
   const selectCls = "rounded-lg border border-hairline bg-card px-2 py-1.5 text-xs text-ink outline-none focus:border-ink";
 
   return (
-    <Screen>
+    <Screen contentClassName="gap-3 px-5 py-5">
       <div className="flex flex-row items-center justify-between">
         <h1 className="flex flex-row items-center gap-2 font-display text-lg font-bold text-ink">
           <Inbox size={18} /> Tickets
@@ -187,46 +187,46 @@ export default function TicketsIndex() {
         {rows.length === 0 ? (
           <EmptyState icon={<Mail size={22} color={colors.slate} />} title={tickets.length === 0 ? "No tickets in this view" : "No tickets match these filters"} />
         ) : (
-          <table className="w-full min-w-[960px] border-collapse text-sm">
+          <table className="w-full table-fixed border-collapse text-[12.5px]">
             <thead>
-              <tr className="border-b border-hairline text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <Th label="Key" sortKey="number" sort={sort} onSort={toggleSort} className="w-28" />
+              <tr className="border-b border-hairline text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Th label="Key" sortKey="number" sort={sort} onSort={toggleSort} className="w-14" />
                 <Th label="Summary" sortKey="subject" sort={sort} onSort={toggleSort} />
-                <Th label="Created" sortKey="created" sort={sort} onSort={toggleSort} className="w-40" />
-                <th className="px-3 py-2">Requester</th>
-                <th className="px-3 py-2">Queue</th>
-                <Th label="Priority" sortKey="priority" sort={sort} onSort={toggleSort} className="w-24" />
-                <th className="px-3 py-2">Assignee</th>
-                <Th label="Status" sortKey="status" sort={sort} onSort={toggleSort} className="w-28" />
-                <th className="px-3 py-2">Resolution</th>
+                <Th label="Created" sortKey="created" sort={sort} onSort={toggleSort} className="w-20" />
+                <th className="px-2 py-1.5 w-20 truncate">Requester</th>
+                <th className="px-2 py-1.5 w-16 truncate">Queue</th>
+                <Th label="Priority" sortKey="priority" sort={sort} onSort={toggleSort} className="w-16" />
+                <th className="px-2 py-1.5 w-20 truncate">Assignee</th>
+                <Th label="Status" sortKey="status" sort={sort} onSort={toggleSort} className="w-20" />
+                <th className="px-2 py-1.5 w-14 truncate">Resolution</th>
               </tr>
             </thead>
             <tbody>
               {pageRows.map((t: TicketListItem) => (
                 <tr key={t.id} onClick={() => navigate(`/tickets/${t.id}`)} className="cursor-pointer border-b border-hairline/70 last:border-0 hover:bg-background">
-                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs font-semibold text-ink">{t.ref ?? "—"}</td>
-                  <td className="max-w-[22rem] px-3 py-2.5">
+                  <td className="truncate px-2 py-2 font-mono text-[11px] font-semibold text-ink">{t.ref ?? "—"}</td>
+                  <td className="px-2 py-2">
                     <span className="block truncate font-medium text-ink">{t.subject}</span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
+                  <td className="truncate px-2 py-2 text-muted-foreground">
                     <span className="text-ink">{fmtDate(t.createdAt)}</span>
-                    <span className="ml-1.5 text-[11px]">{fmtTime(t.createdAt)}</span>
+                    <span className="ml-1 text-[10px]">{fmtTime(t.createdAt)}</span>
                   </td>
-                  <td className="max-w-[12rem] px-3 py-2.5 text-muted-foreground">
+                  <td className="px-2 py-2 text-muted-foreground">
                     <span className="block truncate">{t.requesterName || t.requesterEmail}</span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{t.orgUnit?.name || <span className="text-muted-foreground/60">Unrouted</span>}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5">
-                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PRIORITY_DOT[t.priority] ?? colors.hairline }} />
-                      {t.priority}
+                  <td className="truncate px-2 py-2 text-muted-foreground">{t.orgUnit?.name || <span className="text-muted-foreground/60">Unrouted</span>}</td>
+                  <td className="truncate px-2 py-2">
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: PRIORITY_DOT[t.priority] ?? colors.hairline }} />
+                      <span className="truncate">{t.priority}</span>
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5">{t.assignee ? `${t.assignee.firstName} ${t.assignee.lastName}` : <span className="text-muted-foreground/60">Unassigned</span>}</td>
-                  <td className="px-3 py-2.5">
-                    <span className={cn("inline-block rounded px-1.5 py-0.5 text-[11px] font-semibold", STATUS_STYLE[t.status] || "bg-muted text-slate")}>{STATUS_LABEL[t.status] || t.status}</span>
+                  <td className="truncate px-2 py-2">{t.assignee ? `${t.assignee.firstName} ${t.assignee.lastName}` : <span className="text-muted-foreground/60">Unassigned</span>}</td>
+                  <td className="truncate px-2 py-2">
+                    <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold", STATUS_STYLE[t.status] || "bg-muted text-slate")}>{STATUS_LABEL[t.status] || t.status}</span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{t.status === "resolved" ? "Resolved" : <span className="text-muted-foreground/60">Unresolved</span>}</td>
+                  <td className="truncate px-2 py-2 text-muted-foreground">{t.status === "resolved" ? "Resolved" : <span className="text-muted-foreground/60">Unresolved</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -259,8 +259,8 @@ export default function TicketsIndex() {
 function Th({ label, sortKey, sort, onSort, className = "" }: { label: string; sortKey: SortKey; sort: { key: SortKey; dir: "asc" | "desc" }; onSort: (k: SortKey) => void; className?: string }) {
   const active = sort.key === sortKey;
   return (
-    <th className={cn("px-3 py-2", className)}>
-      <button type="button" onClick={() => onSort(sortKey)} className={cn("inline-flex items-center gap-1 uppercase tracking-wide transition hover:text-ink", active && "text-ink")}>
+    <th className={cn("px-2 py-1.5 truncate", className)}>
+      <button type="button" onClick={() => onSort(sortKey)} className={cn("inline-flex items-center gap-1 truncate uppercase tracking-wide transition hover:text-ink", active && "text-ink")}>
         {label}
         {active ? sort.dir === "asc" ? <ArrowUp size={11} /> : <ArrowDown size={11} /> : <ChevronDown size={11} className="opacity-40" />}
       </button>

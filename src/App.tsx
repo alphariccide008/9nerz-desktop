@@ -54,7 +54,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const minDelay = new Promise((resolve) => setTimeout(resolve, 6000));
+    const minDelay = new Promise((resolve) => setTimeout(resolve, 4000));
     Promise.all([hydrate(), loadSession(), minDelay]).then(() => setReady(true));
   }, []);
 

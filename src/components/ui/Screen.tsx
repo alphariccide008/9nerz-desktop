@@ -19,7 +19,7 @@ export function Screen({
   return (
     <div className={cn("h-full flex-1 overflow-y-auto bg-background", className)}>
       <div
-        className={cn("mx-auto flex w-full flex-col gap-4 px-8 py-6", contentClassName)}
+        className={cn("mx-auto flex w-full flex-col", contentClassName ?? "gap-4 px-8 py-6")}
         style={maxWidth === "none" ? undefined : { maxWidth }}
       >
         {children}
