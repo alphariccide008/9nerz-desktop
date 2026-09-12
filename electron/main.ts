@@ -10,6 +10,22 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
+// Only one copy of 9nerz may run at a time — without this, every launch (and every
+// auto-update relaunch) spawns a new background process instead of reusing the
+// existing one, and the leftover processes eventually block reinstalling/updating
+// because they keep the installed .exe file open.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
+app.on("second-instance", () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
+
 // ── File-backed key/value store (the desktop equivalent of AsyncStorage) ─────
 function readStoreFile(): Record<string, string> {
   try {
@@ -125,16 +141,18 @@ function createTray() {
   tray.on("click", () => mainWindow?.show());
 }
 
-app.whenReady().then(() => {
-  createWindow();
-  createTray();
-  if (!isDev) autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+if (gotSingleInstanceLock) {
+  app.whenReady().then(() => {
+    createWindow();
+    createTray();
+    if (!isDev) autoUpdater.checkForUpdatesAndNotify().catch(() => {});
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    else mainWindow?.show();
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      else mainWindow?.show();
+    });
   });
-});
+}
 
 app.on("before-quit", () => {
   isQuitting = true;
