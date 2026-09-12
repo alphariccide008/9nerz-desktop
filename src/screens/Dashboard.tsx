@@ -151,42 +151,89 @@ export default function Dashboard() {
         </section>
       </div>
 
-      <Card className="p-4">
-        <div className="mb-3 flex flex-row items-center justify-between">
-          <Text variant="heading">On-time delivery</Text>
-          {performance.topPerformer ? (
-            <div className="flex flex-row items-center gap-1">
-              <Award size={13} color={colors.amber} />
-              <Text variant="caption" className="font-medium text-ink">
-                Top: {performance.topPerformer.name} ({performance.topPerformer.otdScore}%)
-              </Text>
-            </div>
-          ) : null}
-        </div>
-        <div className="flex flex-row flex-wrap items-center gap-5">
-          <div className="flex flex-col items-center gap-1">
-            <Donut value={performance.me.otdScore} />
-            <Text variant="caption">You ({performance.me.completed})</Text>
-          </div>
-          {isAdmin ? (
+      <div className="flex flex-col gap-4">
+        {isAdmin ? (
+          <Card className="flex flex-row flex-wrap items-center gap-5 p-4">
             <div className="flex flex-col items-center gap-1">
               <Donut value={performance.companyOtd} tone={colors.ink} />
               <Text variant="caption">Company</Text>
             </div>
-          ) : null}
-          {isAdmin ? (
-            <div className="grid min-w-[240px] flex-1 grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
-              {performance.units.slice(0, 6).map((u) => (
-                <div key={u.unitId} className="flex flex-row items-center justify-between gap-2">
-                  <span className="truncate text-[12px] text-ink">{u.unitName}</span>
-                  <Text variant="caption">{u.otdScore == null ? "—" : `${u.otdScore}%`}</Text>
+            <div className="min-w-0 flex-1">
+              <Text variant="heading">Everyone · on-time delivery</Text>
+              <Text variant="caption" className="block">
+                Every person in the company, ranked
+              </Text>
+            </div>
+            {performance.topPerformer ? (
+              <div className="flex flex-row items-center gap-1">
+                <Award size={13} color={colors.amber} />
+                <Text variant="caption" className="font-medium text-ink">
+                  Top: {performance.topPerformer.name} ({performance.topPerformer.otdScore}%)
+                </Text>
+              </div>
+            ) : null}
+          </Card>
+        ) : (
+          <Card className="flex flex-row flex-wrap items-center gap-5 p-4">
+            <Donut value={performance.me.otdScore} />
+            <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+              <div>
+                <dt className="text-[11px] text-muted-foreground">Delivered</dt>
+                <dd className="font-semibold tabular-nums text-ink">{performance.me.completed}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] text-muted-foreground">On time</dt>
+                <dd className="font-semibold tabular-nums text-teal">{performance.me.onTime}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] text-muted-foreground">Late</dt>
+                <dd className="font-semibold tabular-nums text-destructive">{performance.me.late}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] text-muted-foreground">Score</dt>
+                <dd className="font-semibold text-ink">{performance.me.otdScore == null ? "—" : `${performance.me.otdScore}%`}</dd>
+              </div>
+            </dl>
+          </Card>
+        )}
+
+        {isAdmin && performance.individuals.length > 0 ? (
+          <Card>
+            <header className="border-b border-hairline px-4 py-2.5">
+              <Text variant="heading">Leaderboard</Text>
+            </header>
+            <div className="divide-y divide-hairline/60">
+              {performance.individuals.slice(0, 8).map((p, i) => (
+                <div key={p.userId} className="flex flex-row items-center gap-3 px-4 py-2">
+                  <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{p.name}</span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">{p.completed} done</span>
+                  <span className="w-12 shrink-0 text-right text-sm font-semibold text-ink">{p.otdScore == null ? "—" : `${p.otdScore}%`}</span>
                 </div>
               ))}
-              {performance.units.length === 0 ? <Text variant="caption">No completed, due-dated tasks yet.</Text> : null}
             </div>
-          ) : null}
-        </div>
-      </Card>
+          </Card>
+        ) : null}
+
+        {isAdmin && performance.units.length > 0 ? (
+          <div>
+            <Text variant="heading" className="mb-2 block">
+              Unit performance
+            </Text>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {performance.units.map((u) => (
+                <Card key={u.unitId} className="flex flex-row items-center gap-3 p-3">
+                  <Donut value={u.otdScore} size={44} strokeWidth={5} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">{u.unitName}</p>
+                    <Text variant="caption">{u.completed} completed</Text>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {isAdmin ? (
         <div className="flex flex-row flex-wrap gap-2">

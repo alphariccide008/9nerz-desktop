@@ -16,11 +16,23 @@ const SVG = fs.readFileSync(path.join(BUILD_DIR, "logo.svg"), "utf-8");
 const CHROME =
   process.env.CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 
-const html = `<!doctype html><html><body style="margin:0">${SVG}</body></html>`;
+// The SVG has fixed width="200" height="200" attributes, so without overriding
+// them it always renders at 200x200 regardless of viewport — at any screenshot
+// size smaller than 200 that means the shot only captures a cropped top-left
+// corner of the badge, and at larger sizes it leaves it small with blank space
+// around it. Forcing width/height via CSS makes it scale to fill the viewport.
+// Padded so the badge's own rounded corners sit inset from the icon's square
+// canvas, instead of touching it edge-to-edge (which visually clashes with
+// Windows' own icon-corner rounding). Background stays transparent.
+const html = `<!doctype html><html><head><style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  body { display: flex; align-items: center; justify-content: center; width: 100vw; height: 100vh; }
+  svg { display: block; width: 82%; height: 82%; }
+</style></head><body>${SVG}</body></html>`;
 
 async function renderAt(page, size) {
   await page.setViewport({ width: size, height: size, deviceScaleFactor: 1 });
-  return page.screenshot({ type: "png", clip: { x: 0, y: 0, width: size, height: size } });
+  return page.screenshot({ type: "png", omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
 }
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: ["--no-sandbox"] });

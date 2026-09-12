@@ -2,13 +2,12 @@ import { useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { FileText, Mail, Paperclip, Send, StickyNote, X } from "lucide-react";
 
-import { Screen, PageHeader } from "../../components/ui/Screen";
+import { Screen } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
-import { Select } from "../../components/ui/Select";
-import { StatusPill } from "../../components/ui/Badge";
+import { StatusPill, PriorityBadge } from "../../components/ui/Badge";
 import { Banner, Loading } from "../../components/ui/Feedback";
 import { Linkified } from "../../components/ui/Linkified";
 import { useToast } from "../../components/ui/Toast";
@@ -109,52 +108,61 @@ export default function TicketDetail() {
       <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
       <input ref={pdfInput} type="file" accept="application/pdf" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
 
-      <div className="flex flex-row items-center gap-2">
-        {ticket.ref ? (
-          <div className="rounded bg-ink/[0.06] px-1.5 py-0.5">
-            <span className="text-[11px] font-bold tracking-[0.3px] text-ink">{ticket.ref}</span>
-          </div>
-        ) : null}
-        <StatusPill status={ticket.status} />
+      <div>
+        <div className="flex flex-row flex-wrap items-center gap-2">
+          {ticket.ref ? <span className="rounded bg-ink/[0.06] px-1.5 py-0.5 font-mono text-[11px] font-semibold text-ink">{ticket.ref}</span> : null}
+          <h1 className="min-w-0 break-words font-display text-lg font-bold text-ink">{ticket.subject}</h1>
+          <StatusPill status={ticket.status} />
+          <PriorityBadge priority={ticket.priority} />
+        </div>
+        <Text variant="caption" className="mt-1 block">
+          {ticket.requesterName || ticket.requesterEmail}
+          {ticket.sourceInbox ? ` · via ${ticket.sourceInbox}` : ""} · opened {new Date(ticket.createdAt).toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+        </Text>
       </div>
-      <PageHeader title={ticket.subject} />
-      <Text variant="caption">
-        {ticket.requesterName || ticket.requesterEmail}
-        {ticket.sourceInbox ? ` · via ${ticket.sourceInbox}` : ""}
-      </Text>
 
       {canManage || (NEXT[ticket.status] && canRespond) ? (
-        <Card className="flex flex-col gap-3 p-3">
+        <Card className="flex flex-row flex-wrap items-center gap-3 p-3">
           {isAdmin ? (
-            <Select
-              label="Department"
-              value={ticket.orgUnitId}
-              options={units.map((u) => ({ value: u.id, label: u.name }))}
-              onChange={(v) => act(() => TK.moveQueue(me.id, id, v || null), "Queue updated")}
-              placeholder="Unrouted"
-              allowClear
-            />
+            <label className="flex flex-row items-center gap-1.5 text-[11px] text-muted-foreground">
+              Department
+              <select value={ticket.orgUnitId ?? ""} onChange={(e) => act(() => TK.moveQueue(me.id, id, e.target.value || null), "Queue updated")} className="rounded border border-hairline bg-card px-2 py-1.5 text-xs text-ink outline-none focus:border-ink">
+                <option value="">Unrouted</option>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           ) : null}
           {canManage ? (
-            <Select
-              label="Priority"
-              value={ticket.priority}
-              options={PRIORITIES.map((p) => ({ value: p, label: p }))}
-              onChange={(v) => v && act(() => TK.setPriority(me.id, id, v as (typeof PRIORITIES)[number]), "Priority updated")}
-            />
+            <label className="flex flex-row items-center gap-1.5 text-[11px] text-muted-foreground">
+              Priority
+              <select value={ticket.priority} onChange={(e) => act(() => TK.setPriority(me.id, id, e.target.value as (typeof PRIORITIES)[number]), "Priority updated")} className="rounded border border-hairline bg-card px-2 py-1.5 text-xs text-ink outline-none focus:border-ink">
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </label>
           ) : null}
           {canManage && ticket.orgUnitId ? (
-            <Select
-              label="Assign to"
-              value={ticket.assigneeId}
-              options={unitMembers.map((m) => ({ value: m.id, label: `${m.firstName} ${m.lastName}` }))}
-              onChange={(v) => act(() => TK.assign(me.id, id, v || null), "Assignment updated")}
-              placeholder="Unassigned"
-              allowClear
-            />
+            <label className="flex flex-row items-center gap-1.5 text-[11px] text-muted-foreground">
+              Assign to
+              <select value={ticket.assigneeId ?? ""} onChange={(e) => act(() => TK.assign(me.id, id, e.target.value || null), "Assignment updated")} className="rounded border border-hairline bg-card px-2 py-1.5 text-xs text-ink outline-none focus:border-ink">
+                <option value="">Unassigned</option>
+                {unitMembers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.firstName} {m.lastName}
+                  </option>
+                ))}
+              </select>
+            </label>
           ) : null}
           {canRespond ? (
-            <div className="flex flex-row flex-wrap gap-2">
+            <div className="ml-auto flex flex-row flex-wrap gap-1.5">
               {(NEXT[ticket.status] || []).map(([s, label]) => (
                 <Button key={s} title={label} size="sm" onPress={() => act(() => TK.setStatus(me.id, id, s), "Status updated")} />
               ))}

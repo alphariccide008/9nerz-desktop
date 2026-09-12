@@ -64,8 +64,9 @@ export interface TicketListItem {
   requesterName: string | null;
   sourceInbox: string | null;
   orgUnit: { id: string; name: string } | null;
-  assignee: { firstName: string; lastName: string } | null;
+  assignee: { id: string; firstName: string; lastName: string } | null;
   lastMessageAt: string;
+  createdAt: string;
 }
 
 function managersOfUnit(db: DBType, companyId: string, unitId: string): User[] {
@@ -107,10 +108,11 @@ export function listTickets(userId: string, queue: TicketQueue): TicketListItem[
       orgUnit: t.orgUnitId ? { id: t.orgUnitId, name: db.orgUnits.find((o) => o.id === t.orgUnitId)?.name ?? "" } : null,
       assignee: t.assigneeId ? pick(db.users.find((u) => u.id === t.assigneeId)) : null,
       lastMessageAt: t.lastMessageAt,
+      createdAt: t.createdAt,
     }));
 }
 
-const pick = (u?: User) => (u ? { firstName: u.firstName, lastName: u.lastName } : null);
+const pick = (u?: User) => (u ? { id: u.id, firstName: u.firstName, lastName: u.lastName } : null);
 
 /**
  * Count of tickets in the caller's scope waiting on a reply (awaiting_response,
