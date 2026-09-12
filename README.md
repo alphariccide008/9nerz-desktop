@@ -1,105 +1,80 @@
 # 9nerz-desktop
 
-Tauri (Rust) desktop shell for **9nerz**, replacing the old Electron `desktop/`
-folder that lived inside `9Nerz-mobile`. It wraps the same Expo web export
-(`../9Nerz-mobile` → `npm run export:web`) in a native Windows window, and
-supports auto-update via Tauri's updater plugin.
-
-This folder must stay a **sibling** of `9Nerz-mobile` on disk (both under
-`Desktop/`) — `scripts/build-web.mjs` reaches into `../9Nerz-mobile` to export
-the web build before every `dev`/`build`.
+Electron + React (Vite) desktop shell for **9nerz**, replacing the earlier Tauri
+scaffold that lived in this repo. It ports `../9Nerz-mobile`'s screens and reuses
+its entire business-logic layer (`lib/db`, `lib/services/*`, `lib/session.ts`,
+`lib/util.ts`) verbatim — that code has no React Native dependency, so it's
+copied as-is rather than rewritten.
 
 ## One-time machine setup
 
-- Rust (`rustup`) — https://rustup.rs
-- Microsoft C++ Build Tools (Desktop development with C++ workload) — required
-  by the Rust MSVC linker on Windows
-- WebView2 Runtime — already ships with Windows 11, so usually nothing to do
-- Node.js (already have it, since 9Nerz-mobile needs it)
+- Node.js (already installed, since 9Nerz-mobile needs it)
+- Google Chrome or Edge, only if you regenerate the app icon (`npm run icons`)
+  uses it headlessly to rasterize `build/logo.svg`
+- **Windows Developer Mode** (Settings → Privacy & security → For developers),
+  or an elevated (Run as Administrator) terminal — `electron-builder` needs
+  permission to create symlinks while unpacking one of its helper packages.
+  Without this, `npm run dist` fails with `Cannot create symbolic link: A
+  required privilege is not held by the client.`
 
-Then in this folder:
+Then:
 
 ```bash
 npm install
 ```
 
-## Before your first real build — things I need from you
-
-1. ~~GitHub repo for releases.~~ Done — `src-tauri/tauri.conf.json` →
-   `plugins.updater.endpoints` points at
-   `https://github.com/alphariccide008/9nerz-desktop/releases/latest/download/latest.json`
-   (this repo, public).
-
-2. **Signing keypair.** The updater requires every release to be signed.
-   Generate it once:
-
-   ```bash
-   npm run signer:generate
-   ```
-
-   This writes `9nerz-updater.key` (private — **never commit or share this**,
-   it's already gitignored) and prints a public key. Copy that public key into
-   `src-tauri/tauri.conf.json` → `plugins.updater.pubkey`.
-
-   When building, point Tauri at the private key so it signs the build:
-
-   ```bash
-   # PowerShell
-   $env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content .\9nerz-updater.key -Raw)
-   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""   # set if you passworded the key
-   ```
-
-   Keep `9nerz-updater.key` somewhere safe outside git (a password manager or
-   private note) — if you lose it you can't ship updates that existing installs
-   will trust; you'd have to ship a new pubkey and users would need to
-   reinstall manually once.
-
-3. **App icons.** Right now `src-tauri/icons/` is empty. Generate them from the
-   existing mobile app icon:
-
-   ```bash
-   npm run icons
-   ```
-
-## Building
-
-```bash
-npm run build
-```
-
-This runs `build:web` (exports `9Nerz-mobile` → copies into `./dist`), then
-`tauri build`, which produces in `src-tauri/target/release/bundle/`:
-
-- `nsis/9nerz_<version>_x64-setup.exe` — the installer
-- `nsis/9nerz_<version>_x64-setup.exe.sig` — signature over the installer
-- `msi/...` (also built, since `targets` includes `msi`)
-
-`tauri build` with `createUpdaterArtifacts: true` also emits a `latest.json`
-next to the bundles (or use `tauri` CLI's updater artifact output — check the
-build log for the exact path if it's not there, this varies slightly by CLI
-version).
-
-## Publishing a release (same flow you already used once)
-
-1. GitHub → your repo → **Releases** → **New release**
-2. Tag it (e.g. `v0.1.0`)
-3. Upload the `.exe`, `.sig`, and `latest.json`
-4. Publish
-
-Anyone running an older installed build will have it check
-`plugins.updater.endpoints` (pointed at
-`.../releases/latest/download/latest.json`) and prompt to update.
-
-## Dev loop
+## Run it (dev mode)
 
 ```bash
 npm run dev
 ```
 
-## What changed vs. the old Electron setup
+Starts the Vite dev server on `http://localhost:5173` and launches Electron
+pointed at it, with hot reload for the renderer.
 
-- `9Nerz-mobile/desktop/` (Electron) has been removed.
-- This is a separate top-level folder/repo, not nested inside `9Nerz-mobile`,
-  so it can have its own git history / releases independent of the mobile
-  app's repo.
-- Auto-update is new — Electron's `desktop/` had none.
+## Build the installer
+
+```bash
+npm run dist:win
+```
+
+Produces, in `release/`:
+
+- `9nerz Setup <version>.exe` — the NSIS installer (Start Menu shortcut,
+  desktop shortcut, uninstaller)
+- `latest.yml` + block-map files, used by `electron-updater`
+
+`npm run build` alone just compiles the renderer + main/preload without
+packaging, if you want to sanity-check a build.
+
+## Auto-updates
+
+`electron-builder.yml` points `publish` at
+`github.com/alphariccide008/9nerz-desktop` (this repo). To ship an update:
+
+1. Bump `version` in `package.json`
+2. `npm run dist:win`
+3. Create a GitHub release tagged `v<version>` and upload everything in
+   `release/` (the `.exe`, `.blockmap`, and `latest.yml`)
+
+Installed copies check that endpoint on launch (`electron-updater` in
+`electron/main.ts`) and prompt to update.
+
+## Regenerating the icon
+
+```bash
+npm run icons
+```
+
+Renders `build/logo.svg` (the real 9nerz mark, ported from mobile's
+`LogoMark`) to `build/icon.png` and `build/icon.ico` via a headless Chrome
+screenshot. Set `CHROME_PATH` if Chrome isn't at the default Windows location.
+
+## What's ported vs. rebuilt vs. skipped
+
+See the project chat history / PR description for the full breakdown. Short
+version: all business logic is verbatim from `9Nerz-mobile/lib`; all UI is
+rebuilt in plain React + Tailwind (same color tokens, same component API
+surface); the animated 3D welcome-screen background and the ticket
+"simulate inbound" dev tool were skipped as out-of-scope decoration/dev-only
+utilities.

@@ -1,0 +1,29 @@
+appId: app.nerz.desktop
+productName: 9nerz
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/electron/**/*
+  - dist/renderer/**/*
+  - package.json
+extraResources:
+  - from: build/icon.png
+    to: icon.png
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 9nerz
+  uninstallDisplayName: 9nerz
+publish:
+  provider: github
+  owner: alphariccide008
+  repo: 9nerz-desktop
