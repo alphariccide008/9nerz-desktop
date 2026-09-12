@@ -79,7 +79,7 @@ export default function Billing() {
 
   return (
     <AdminGuard>
-      <Screen maxWidth={620}>
+      <Screen maxWidth={840}>
         <PageHeader title="Billing" subtitle="Your plan is capped on structure, never on features." />
 
         {status.status === "trialing" ? (

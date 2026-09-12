@@ -23,6 +23,7 @@ import TaskDetail from "./screens/tasks/TaskDetail";
 import NewTask from "./screens/tasks/NewTask";
 import TicketsIndex from "./screens/tickets/TicketsIndex";
 import TicketDetail from "./screens/tickets/TicketDetail";
+import SimulateInbound from "./screens/tickets/SimulateInbound";
 import Notifications from "./screens/Notifications";
 import Profile from "./screens/Profile";
 import Approvals from "./screens/Approvals";
@@ -53,7 +54,8 @@ export default function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    Promise.all([hydrate(), loadSession()]).then(() => setReady(true));
+    const minDelay = new Promise((resolve) => setTimeout(resolve, 6000));
+    Promise.all([hydrate(), loadSession(), minDelay]).then(() => setReady(true));
   }, []);
 
   if (!ready) return <Splash />;
@@ -77,6 +79,7 @@ export default function App() {
             <Route path="/tasks/new" element={<NewTask />} />
             <Route path="/tasks/:id" element={<TaskDetail />} />
             <Route path="/tickets" element={<TicketsIndex />} />
+            <Route path="/tickets/simulate-inbound" element={<SimulateInbound />} />
             <Route path="/tickets/:id" element={<TicketDetail />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />

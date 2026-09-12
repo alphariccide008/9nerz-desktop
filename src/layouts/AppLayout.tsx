@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { SidebarContent } from "../components/shell/Sidebar";
-import { useCurrentUser } from "../lib/hooks";
+import { useCurrentUser, useUnreadCount } from "../lib/hooks";
 import { useSession } from "../lib/session";
 import { onboardingStatus } from "../lib/services/org";
 import { ping } from "../lib/services/auth";
+import { updateTaskbarBadge } from "../lib/badge";
 
 const SIDEBAR_W = 248;
 
@@ -12,6 +13,13 @@ export default function AppLayout() {
   const { ready, userId } = useSession();
   const me = useCurrentUser();
   const navigate = useNavigate();
+  const unread = useUnreadCount();
+
+  useEffect(() => {
+    updateTaskbarBadge(unread);
+  }, [unread]);
+
+  useEffect(() => () => updateTaskbarBadge(0), []);
 
   useEffect(() => {
     if (!ready) return;

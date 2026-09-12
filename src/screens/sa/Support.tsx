@@ -28,7 +28,7 @@ export default function SaSupport() {
   const mailbox = useMemo(() => listPlatformTickets(statusFilter), [tick, statusFilter]);
 
   return (
-    <Screen maxWidth={720}>
+    <Screen>
       <PageHeader
         title="Support"
         subtitle="Questions the in-app assistant couldn't answer, plus support@9nerz.app."

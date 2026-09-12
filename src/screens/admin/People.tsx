@@ -1,16 +1,13 @@
 import { useMemo, useState } from "react";
-import { Check, Clock, Mail, UserPlus, X } from "lucide-react";
+import { Clock, Mail, UserPlus, X } from "lucide-react";
 
 import { Screen, PageHeader } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Sheet } from "../../components/ui/Sheet";
 import { Badge } from "../../components/ui/Badge";
-import { Avatar } from "../../components/ui/Avatar";
-import { Banner } from "../../components/ui/Feedback";
 import { useToast } from "../../components/ui/Toast";
 import { AdminGuard } from "../../components/admin/AdminGuard";
 import { useCurrentUser } from "../../lib/hooks";
@@ -19,19 +16,23 @@ import { createInvite, listInvites, listMembers, listRoles, listUnits, patchMemb
 import { shortDate } from "../../lib/util";
 import { colors } from "../../lib/theme";
 
+const STATUS_BADGE: Record<string, string> = {
+  active: "bg-teal/15 text-teal",
+  invited: "bg-amber/20 text-[#8a5a12]",
+  inactive: "bg-muted text-slate",
+};
+
 export default function People() {
   const me = useCurrentUser();
   const toast = useToast();
   const tick = useDB((db) => db.users.map((u) => `${u.id}${u.roleId}${u.reportsToUserId}${u.status}`).join(",") + db.userOrgUnits.length);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [detail, setDetail] = useState<string | null>(null);
 
   const members = useMemo(() => (me ? listMembers(me.companyId) : []), [me, tick]);
   const roles = useMemo(() => (me ? listRoles(me.companyId) : []), [me, tick]);
   const units = useMemo(() => (me ? listUnits(me.companyId).units : []), [me, tick]);
   const invites = useMemo(() => (me ? listInvites(me.companyId) : []), [me, tick]);
   const active = members.filter((m) => m.status !== "invited");
-  const selected = members.find((m) => m.id === detail);
 
   if (!me) return null;
 
@@ -46,59 +47,125 @@ export default function People() {
 
   return (
     <AdminGuard>
-      <Screen maxWidth={720}>
+      <Screen>
         <PageHeader title="People" subtitle="Invite people, set their role, unit and who they report to." right={<Button title="Invite" size="sm" icon={<UserPlus size={14} color={colors.white} />} onPress={() => setInviteOpen(true)} />} />
 
         {invites.length > 0 ? (
-          <Card className="flex flex-col gap-1.5 border-amber/40 bg-amber/[0.06] p-3">
-            <Text variant="caption" className="font-semibold uppercase tracking-wide text-[#B45309]">
+          <div className="rounded-xl border border-amber/40 bg-amber/[0.06] p-3">
+            <Text variant="caption" className="mb-1.5 block font-semibold uppercase tracking-wide text-[#8a5a12]">
               Pending invites
             </Text>
-            {invites.map((iv) => (
-              <div key={iv.id} className="flex flex-row items-center gap-2">
-                <Mail size={13} color="#B45309" />
-                <span className="text-[13px] text-ink">{iv.email}</span>
-                {iv.role ? <Text variant="caption">· {iv.role.name}</Text> : null}
-                <Text variant="caption" className="ml-auto flex items-center gap-1">
-                  <Clock size={10} color={colors.mutedForeground} /> {shortDate(iv.inviteExpires)}
-                </Text>
-                <button
-                  type="button"
-                  onClick={() => {
-                    revokeInvite(me.id, iv.id);
-                    toast.show("Invite revoked", "success");
-                  }}
-                >
-                  <X size={13} color={colors.slate} />
-                </button>
-              </div>
-            ))}
-            {invites[0]?.token ? (
-              <Banner tone="info">
-                <Text variant="caption">Dev: share this link — nerz://accept-invite?token={invites[0].token}</Text>
-              </Banner>
-            ) : null}
-          </Card>
+            <div className="flex flex-col gap-1">
+              {invites.map((iv) => (
+                <div key={iv.id} className="flex flex-row flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink">
+                  <Mail size={13} color="#8a5a12" />
+                  {iv.email}
+                  {iv.role ? <span className="text-xs text-muted-foreground">· {iv.role.name}</span> : null}
+                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Clock size={10} /> expires {shortDate(iv.inviteExpires)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      revokeInvite(me.id, iv.id);
+                      toast.show("Invite revoked", "success");
+                    }}
+                    className="ml-auto rounded-md border border-hairline bg-card px-2 py-1 text-[11px] font-medium text-slate hover:border-destructive hover:text-destructive"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : null}
 
-        <Card>
-          {active.map((m, i) => (
-            <button key={m.id} type="button" onClick={() => setDetail(m.id)} className={`flex w-full flex-row items-center gap-3 px-3 py-3 text-left ${i > 0 ? "border-t border-hairline/60" : ""}`}>
-              <Avatar name={`${m.firstName} ${m.lastName}`} size="sm" lastActiveAt={m.lastActiveAt} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium text-ink">
-                  {m.firstName} {m.lastName}
-                  {m.isCompanyAdmin ? <span className="text-teal"> · admin</span> : null}
-                </div>
-                <Text variant="caption" className="block truncate">
-                  {m.roleName ?? "no role"}
-                  {m.primaryUnitName ? ` · ${m.primaryUnitName}` : ""}
-                </Text>
-              </div>
-              <Badge label={m.status} className={m.status === "active" ? "bg-teal/15" : "bg-muted"} />
-            </button>
-          ))}
-        </Card>
+        <div className="overflow-x-auto rounded-xl border border-hairline bg-card">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead>
+              <tr className="border-b border-hairline text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Role</th>
+                <th className="px-3 py-2 font-medium">Unit</th>
+                <th className="px-3 py-2 font-medium">Reports to</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-hairline">
+              {active.map((m) => (
+                <tr key={m.id} className="hover:bg-background">
+                  <td className="px-3 py-2">
+                    <p className="font-medium text-ink">
+                      {m.firstName} {m.lastName}
+                      {m.isCompanyAdmin ? <span className="ml-1.5 rounded bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-white">admin</span> : null}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">{m.email}</p>
+                  </td>
+                  <td className="px-3 py-2">
+                    <select
+                      value={m.roleId ?? ""}
+                      onChange={(e) => patch(m.id, { roleId: e.target.value || null })}
+                      className="rounded border border-hairline bg-card px-1.5 py-1 text-xs text-ink outline-none focus:border-ink"
+                    >
+                      <option value="">—</option>
+                      {roles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
+                    <select
+                      value={m.primaryUnitId ?? ""}
+                      onChange={(e) => patch(m.id, { unitIds: e.target.value ? [e.target.value] : [], primaryUnitId: e.target.value || null })}
+                      className="rounded border border-hairline bg-card px-1.5 py-1 text-xs text-ink outline-none focus:border-ink"
+                    >
+                      <option value="">—</option>
+                      {units.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
+                    {m.isCompanyAdmin ? (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ) : (
+                      <select
+                        value={m.reportsToUserId ?? ""}
+                        onChange={(e) => patch(m.id, { reportsToUserId: e.target.value || null })}
+                        className="rounded border border-hairline bg-card px-1.5 py-1 text-xs text-ink outline-none focus:border-ink"
+                      >
+                        <option value="">—</option>
+                        {active.filter((o) => o.id !== m.id).map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.firstName} {o.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {m.isCompanyAdmin ? (
+                      <Badge label={m.status} className={STATUS_BADGE[m.status]} />
+                    ) : (
+                      <select
+                        value={m.status}
+                        onChange={(e) => patch(m.id, { status: e.target.value as "active" | "inactive" })}
+                        className={`rounded border-0 px-1.5 py-0.5 text-[11px] font-semibold capitalize ${STATUS_BADGE[m.status] || ""}`}
+                      >
+                        <option value="active">active</option>
+                        <option value="inactive">inactive</option>
+                      </select>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         <InviteSheet
           open={inviteOpen}
@@ -116,66 +183,6 @@ export default function People() {
             }
           }}
         />
-
-        <Sheet visible={!!selected} onClose={() => setDetail(null)} title={selected ? `${selected.firstName} ${selected.lastName}` : ""}>
-          {selected ? (
-            <div className="flex flex-col gap-3">
-              <Text variant="caption">{selected.email}</Text>
-              <Select label="Role" value={selected.roleId} options={roles.map((r) => ({ value: r.id, label: r.name }))} onChange={(v) => patch(selected.id, { roleId: v || null })} allowClear />
-              <div className="flex flex-col gap-1.5">
-                <Text variant="label">Units (a person can belong to more than one)</Text>
-                {units.map((u) => {
-                  const membership = selected.units.find((x) => x.id === u.id);
-                  const checked = !!membership;
-                  return (
-                    <div key={u.id} className="flex flex-row items-center gap-2.5 py-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const currentIds = selected.units.map((x) => x.id);
-                          const nextIds = checked ? currentIds.filter((id) => id !== u.id) : [...currentIds, u.id];
-                          const nextPrimary =
-                            checked && membership?.isPrimary ? nextIds[0] ?? null : selected.primaryUnitId && nextIds.includes(selected.primaryUnitId) ? selected.primaryUnitId : nextIds[0] ?? null;
-                          patch(selected.id, { unitIds: nextIds, primaryUnitId: nextPrimary });
-                        }}
-                        className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-ink bg-ink" : "border-hairline"}`}
-                      >
-                        {checked ? <Check size={11} color="#fff" /> : null}
-                      </button>
-                      <span className="flex-1 text-[13px] text-ink">{u.name}</span>
-                      {checked ? (
-                        <button type="button" onClick={() => patch(selected.id, { unitIds: selected.units.map((x) => x.id), primaryUnitId: u.id })}>
-                          <Text variant="caption" className={membership?.isPrimary ? "font-semibold text-teal" : ""}>
-                            {membership?.isPrimary ? "primary" : "set primary"}
-                          </Text>
-                        </button>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-              <Select
-                label="Reports to"
-                value={selected.reportsToUserId}
-                options={active.filter((o) => o.id !== selected.id).map((o) => ({ value: o.id, label: `${o.firstName} ${o.lastName}` }))}
-                onChange={(v) => patch(selected.id, { reportsToUserId: v || null })}
-                allowClear
-              />
-              {!selected.isCompanyAdmin ? (
-                <div className="flex flex-row gap-2">
-                  <Button
-                    title={selected.status === "inactive" ? "Reactivate" : "Deactivate"}
-                    variant={selected.status === "inactive" ? "primary" : "outline"}
-                    size="sm"
-                    onPress={() => patch(selected.id, { status: selected.status === "inactive" ? "active" : "inactive" })}
-                  />
-                </div>
-              ) : (
-                <Banner tone="info">The company admin can't be deactivated.</Banner>
-              )}
-            </div>
-          ) : null}
-        </Sheet>
       </Screen>
     </AdminGuard>
   );

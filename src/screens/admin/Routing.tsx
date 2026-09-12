@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, Mail, Plus, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Check, Copy, Mail, MailPlus, Plus, Trash2 } from "lucide-react";
 
 import { Screen, PageHeader } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
@@ -11,6 +12,7 @@ import { Sheet } from "../../components/ui/Sheet";
 import { Banner } from "../../components/ui/Feedback";
 import { useToast } from "../../components/ui/Toast";
 import { AdminGuard } from "../../components/admin/AdminGuard";
+import { MailboxConnect } from "../../components/admin/MailboxConnect";
 import { useCurrentUser } from "../../lib/hooks";
 import { useDB } from "../../lib/db/store";
 import { addInbox, addRoutingRule, deleteRoutingRule, listInboxes, listRoutingRules } from "../../lib/services/tickets";
@@ -20,6 +22,7 @@ import { colors } from "../../lib/theme";
 
 export default function Routing() {
   const me = useCurrentUser();
+  const navigate = useNavigate();
   const toast = useToast();
   const tick = useDB((db) => db.ticketInboxes.length + db.ticketRoutingRules.length);
   const [ruleOpen, setRuleOpen] = useState(false);
@@ -28,6 +31,13 @@ export default function Routing() {
   const [subject, setSubject] = useState("");
   const [ruleUnit, setRuleUnit] = useState<string | null>(null);
   const [ruleInbox, setRuleInbox] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copy = (address: string) => {
+    navigator.clipboard?.writeText(address);
+    setCopied(address);
+    setTimeout(() => setCopied(null), 1500);
+  };
 
   const inboxes = useMemo(() => (me ? listInboxes(me.companyId) : []), [me, tick]);
   const rules = useMemo(() => (me ? listRoutingRules(me.companyId) : []), [me, tick]);
@@ -46,8 +56,18 @@ export default function Routing() {
 
   return (
     <AdminGuard>
-      <Screen maxWidth={640}>
-        <PageHeader title="Email routing" subtitle="Inbound addresses and the rules that sort mail into queues." />
+      <Screen>
+        <PageHeader
+          title="Email routing"
+          subtitle="Inbound addresses and the rules that sort mail into queues."
+          right={<Button title="Simulate inbound" size="sm" variant="outline" icon={<MailPlus size={14} color={colors.ink} />} onPress={() => navigate("/tickets/simulate-inbound")} />}
+        />
+
+        <MailboxConnect companyId={me.companyId} actorId={me.id} units={units} />
+
+        <Text variant="caption" className="pt-1 font-semibold uppercase tracking-wide text-muted-foreground">
+          …or use a 9nerz-hosted address
+        </Text>
 
         <div>
           <div className="mb-2 flex flex-row items-center justify-between">
@@ -58,8 +78,11 @@ export default function Routing() {
             {inboxes.map((i, n) => (
               <div key={i.id} className={`flex flex-row items-center gap-2 px-4 py-3 ${n > 0 ? "border-t border-hairline/60" : ""}`}>
                 <Mail size={14} color={colors.slate} />
-                <span className="flex-1 text-[13px] text-ink">{i.address}</span>
+                <code className="flex-1 truncate text-[13px] text-ink">{i.address}</code>
                 {i.isDefault ? <Text variant="caption">default</Text> : null}
+                <button type="button" onClick={() => copy(i.address)} className="shrink-0 rounded p-1 text-slate hover:bg-background" title="Copy address">
+                  {copied === i.address ? <Check size={14} color={colors.teal} /> : <Copy size={14} />}
+                </button>
               </div>
             ))}
           </Card>

@@ -258,6 +258,36 @@ export interface TicketRoutingRule {
   createdAt: ISODate;
 }
 
+/**
+ * "Connect your own mailbox" (IMAP/SMTP) — desktop-only addition, not present in
+ * the mobile app's schema. There is no backend here (no real IMAP/SMTP client),
+ * so this is a local simulation: save/test/disconnect all just update this
+ * record, matching the visual template of the real web app's mailbox-connect
+ * feature without pretending to reach a real mail server.
+ */
+export type MailboxLastStatus = "pending" | "ok";
+
+export interface MailboxAccount {
+  id: UUID;
+  companyId: UUID;
+  provider: string;
+  emailAddress: string;
+  displayName: string | null;
+  defaultOrgUnitId: UUID | null;
+  imapHost: string;
+  imapPort: number;
+  imapSecure: boolean;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  mailboxFolder: string;
+  postAction: "seen" | "move";
+  lastStatus: MailboxLastStatus;
+  lastCheckedAt: ISODate | null;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
 export type TicketStatus = "open" | "in_progress" | "resolved" | "reopened";
 
 export interface Ticket {
@@ -449,6 +479,7 @@ export interface DB {
   notifications: NotificationRow[];
   ticketInboxes: TicketInbox[];
   ticketRoutingRules: TicketRoutingRule[];
+  mailboxAccounts: MailboxAccount[];
   tickets: Ticket[];
   ticketMessages: TicketMessage[];
   attachments: Attachment[];
@@ -483,6 +514,7 @@ export const EMPTY_DB: DB = {
   notifications: [],
   ticketInboxes: [],
   ticketRoutingRules: [],
+  mailboxAccounts: [],
   tickets: [],
   ticketMessages: [],
   attachments: [],

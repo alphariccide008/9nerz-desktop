@@ -57,7 +57,7 @@ export default function NewTask() {
   };
 
   return (
-    <Screen maxWidth={560}>
+    <Screen maxWidth={680}>
       <PageHeader title="New task" subtitle="Create a task for someone who reports to you." />
       {error ? <Banner tone="error">{error}</Banner> : null}
       {people.length === 0 ? <Banner tone="warn">Nobody reports to you yet, so there's no one to assign a task to.</Banner> : null}

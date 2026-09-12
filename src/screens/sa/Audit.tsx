@@ -15,7 +15,7 @@ export default function SaAudit() {
   const saRows = useMemo(() => saAuditLog(), [tick]);
 
   return (
-    <Screen maxWidth={720}>
+    <Screen>
       <PageHeader title="Platform audit" subtitle="Cross-company log + the tamper-evident owner action log." />
       <Segmented
         options={[

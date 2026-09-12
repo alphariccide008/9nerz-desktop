@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Mail } from "lucide-react";
+import { ChevronRight, Mail, MailPlus } from "lucide-react";
 
 import { Screen, PageHeader } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
 import { Card } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
 import { Segmented } from "../../components/ui/Segmented";
 import { StatusPill } from "../../components/ui/Badge";
 import { EmptyState } from "../../components/ui/Feedback";
-import { useCurrentUser } from "../../lib/hooks";
+import { useCurrentUser, useIsAdmin } from "../../lib/hooks";
 import { useDB } from "../../lib/db/store";
 import { escalateOverdueTickets, listTickets, TicketQueue } from "../../lib/services/tickets";
 import { shortDate } from "../../lib/util";
@@ -22,6 +23,7 @@ const TABS: { value: TicketQueue; label: string }[] = [
 
 export default function TicketsIndex() {
   const me = useCurrentUser();
+  const isAdmin = useIsAdmin();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TicketQueue>("all");
   const tick = useDB((db) => db.tickets.map((t) => t.updatedAt).join(","));
@@ -35,8 +37,12 @@ export default function TicketsIndex() {
   if (!me) return null;
 
   return (
-    <Screen maxWidth={760}>
-      <PageHeader title="Tickets" subtitle="Support email, routed to the right queue." />
+    <Screen>
+      <PageHeader
+        title="Tickets"
+        subtitle="Support email, routed to the right queue."
+        right={isAdmin ? <Button title="Simulate inbound" size="sm" variant="outline" icon={<MailPlus size={14} color={colors.ink} />} onPress={() => navigate("/tickets/simulate-inbound")} /> : undefined}
+      />
       <Segmented options={TABS} value={tab} onChange={setTab} />
 
       {tickets.length === 0 ? (

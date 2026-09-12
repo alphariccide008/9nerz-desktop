@@ -88,7 +88,7 @@ export default function Profile() {
   };
 
   return (
-    <Screen maxWidth={620}>
+    <Screen maxWidth={840}>
       <PageHeader title="Profile" subtitle="Manage your account." />
 
       <Card className="flex flex-row items-center gap-3 p-4">

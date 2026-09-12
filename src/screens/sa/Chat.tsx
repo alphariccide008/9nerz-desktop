@@ -27,7 +27,7 @@ export default function SaChat() {
   };
 
   return (
-    <Screen maxWidth={860}>
+    <Screen maxWidth="none">
       <div className="flex flex-1 flex-row gap-3">
         <div className="w-56 shrink-0">
           <Text variant="heading" className="mb-2 block">

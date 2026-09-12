@@ -35,7 +35,7 @@ export default function Approvals() {
   };
 
   return (
-    <Screen maxWidth={640}>
+    <Screen>
       <PageHeader title="Approvals" subtitle="Actions parked pending an admin's decision." />
       {!isAdmin ? <Banner tone="info">Only admins can decide on approval requests.</Banner> : null}
 

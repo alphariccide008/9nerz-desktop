@@ -39,7 +39,7 @@ export default function SaOperations() {
     health.openPlatformTickets === 0;
 
   return (
-    <Screen maxWidth={760}>
+    <Screen>
       <PageHeader
         title="Operations"
         subtitle="Platform health signals — no cron here, so this reflects the last time each check ran."

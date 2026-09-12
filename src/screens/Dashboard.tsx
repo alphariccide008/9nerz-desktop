@@ -44,23 +44,25 @@ export default function Dashboard() {
   const { chain, mine, teamOverdue, performance } = data;
 
   return (
-    <Screen maxWidth={860}>
+    <Screen maxWidth="none">
       <div className="flex flex-row items-end justify-between">
         <div>
-          <Text variant="title">Hi {me.firstName}</Text>
+          <h1 className="font-display text-xl font-bold text-ink">Hi {me.firstName}</h1>
           <Text variant="caption" className="mt-0.5 block">
             {chain.user.role ?? "No role set"}
             {chain.chain[0] ? ` · reports to ${chain.chain[0].name}` : ""}
           </Text>
         </div>
-        <button type="button" onClick={() => navigate("/tasks")} className="rounded-lg border border-hairline bg-card px-2.5 py-1.5">
-          <Text variant="caption" className="font-medium text-ink">
-            All tasks
-          </Text>
+        <button
+          type="button"
+          onClick={() => navigate("/tasks")}
+          className="rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink"
+        >
+          All tasks
         </button>
       </div>
 
-      <div className="flex flex-row flex-wrap gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <Stat icon={ListChecks} label="My open tasks" value={mine.length} tone="navy" onPress={() => navigate("/tasks")} />
         <Stat icon={AlertTriangle} label="Team overdue" value={teamOverdue.length} tone={teamOverdue.length ? "red" : "muted"} onPress={() => navigate("/tasks")} />
         {isAdmin && counts ? (
@@ -76,73 +78,77 @@ export default function Dashboard() {
         )}
       </div>
 
-      <Card>
-        <div className="flex flex-row items-center justify-between border-b border-hairline px-4 py-2.5">
-          <Text variant="heading">My tasks</Text>
-          <button type="button" onClick={() => navigate("/tasks")}>
-            <Text variant="caption" tone="teal" className="font-medium">
+      <div className="grid gap-4 lg:grid-cols-5">
+        <section className="rounded-xl border border-hairline bg-card lg:col-span-3">
+          <header className="flex flex-row items-center justify-between border-b border-hairline px-4 py-2.5">
+            <Text variant="heading">My tasks</Text>
+            <button type="button" onClick={() => navigate("/tasks")} className="text-xs font-medium text-teal hover:underline">
               View all
-            </Text>
-          </button>
-        </div>
-        {mine.length === 0 ? (
-          <div className="px-4 py-8">
-            <Text variant="caption" className="block text-center">
-              Nothing on your plate.
-            </Text>
-          </div>
-        ) : (
-          mine.slice(0, 6).map((t, i) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => navigate(`/tasks/${t.id}`)}
-              className={`flex w-full flex-row items-center gap-2.5 px-4 py-2.5 text-left ${i > 0 ? "border-t border-hairline/60" : ""}`}
-            >
-              <StatusDot status={t.status} />
-              <span className="flex-1 truncate text-[13px] text-ink">{t.title}</span>
-              {t.dueDate ? <Text variant="caption">{shortDate(t.dueDate)}</Text> : null}
-              <ChevronRight size={14} color={colors.mutedForeground} />
             </button>
-          ))
-        )}
-      </Card>
+          </header>
+          {mine.length === 0 ? (
+            <div className="px-4 py-8">
+              <Text variant="caption" className="block text-center">
+                Nothing on your plate.
+              </Text>
+            </div>
+          ) : (
+            <div className="divide-y divide-hairline/60">
+              {mine.slice(0, 6).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => navigate(`/tasks/${t.id}`)}
+                  className="flex w-full flex-row items-center gap-2.5 px-4 py-2.5 text-left hover:bg-background"
+                >
+                  <StatusDot status={t.status} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{t.title}</span>
+                  {t.dueDate ? <span className="shrink-0 text-[11px] text-muted-foreground">{shortDate(t.dueDate)}</span> : null}
+                  <ChevronRight size={14} color={colors.mutedForeground} />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
 
-      <div className="flex flex-row flex-wrap gap-3">
-        <Card className="min-w-[240px] flex-1 p-4">
-          <div className="mb-2 flex flex-row items-center gap-1.5">
-            <Network size={15} color={colors.ink} />
-            <Text variant="heading">Reporting line</Text>
-          </div>
-          {chain.chain.length ? (
-            chain.chain.map((s, i) => (
-              <div key={s.id} className="flex flex-row items-center gap-2 py-0.5">
-                <Text variant="caption" className="w-9 uppercase">
-                  {i === 0 ? "Mgr" : `+${i}`}
-                </Text>
-                <span className="truncate text-[13px] text-ink">{s.name}</span>
+        <section className="flex flex-col gap-4 lg:col-span-2">
+          <div className="rounded-xl border border-hairline bg-card p-4">
+            <div className="mb-2 flex flex-row items-center gap-1.5">
+              <Network size={15} color={colors.ink} />
+              <Text variant="heading">Reporting line</Text>
+            </div>
+            {chain.chain.length ? (
+              <div className="flex flex-col gap-1">
+                {chain.chain.map((s, i) => (
+                  <div key={s.id} className="flex flex-row items-center gap-2 text-sm text-ink">
+                    <span className="w-8 shrink-0 text-[10px] uppercase text-muted-foreground">{i === 0 ? "Mgr" : `+${i}`}</span>
+                    <span className="truncate">{s.name}</span>
+                  </div>
+                ))}
               </div>
-            ))
-          ) : (
-            <Text variant="caption">You don't report to anyone yet.</Text>
-          )}
-        </Card>
-        <Card className="min-w-[240px] flex-1 p-4">
-          <div className="mb-2 flex flex-row items-center gap-1.5">
-            <Users size={15} color={colors.ink} />
-            <Text variant="heading">My team</Text>
+            ) : (
+              <Text variant="caption">You don't report to anyone yet.</Text>
+            )}
           </div>
-          {chain.directReports.length ? (
-            chain.directReports.slice(0, 6).map((r) => (
-              <div key={r.id} className="truncate py-0.5 text-[13px] text-ink">
-                {r.name}
-                {r.role ? <Text variant="caption"> · {r.role}</Text> : null}
+          <div className="rounded-xl border border-hairline bg-card p-4">
+            <div className="mb-2 flex flex-row items-center gap-1.5">
+              <Users size={15} color={colors.ink} />
+              <Text variant="heading">My team</Text>
+            </div>
+            {chain.directReports.length ? (
+              <div className="flex flex-col gap-1">
+                {chain.directReports.slice(0, 6).map((r) => (
+                  <div key={r.id} className="truncate text-sm text-ink">
+                    {r.name}
+                    {r.role ? <span className="text-xs text-muted-foreground"> · {r.role}</span> : null}
+                  </div>
+                ))}
               </div>
-            ))
-          ) : (
-            <Text variant="caption">Nobody reports to you yet.</Text>
-          )}
-        </Card>
+            ) : (
+              <Text variant="caption">Nobody reports to you yet.</Text>
+            )}
+          </div>
+        </section>
       </div>
 
       <Card className="p-4">
@@ -169,9 +175,9 @@ export default function Dashboard() {
             </div>
           ) : null}
           {isAdmin ? (
-            <div className="min-w-[160px] flex-1 flex flex-col gap-1.5">
-              {performance.units.slice(0, 4).map((u) => (
-                <div key={u.unitId} className="flex flex-row items-center justify-between">
+            <div className="grid min-w-[240px] flex-1 grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+              {performance.units.slice(0, 6).map((u) => (
+                <div key={u.unitId} className="flex flex-row items-center justify-between gap-2">
                   <span className="truncate text-[12px] text-ink">{u.unitName}</span>
                   <Text variant="caption">{u.otdScore == null ? "—" : `${u.otdScore}%`}</Text>
                 </div>
@@ -192,10 +198,8 @@ export default function Dashboard() {
               ["Permission policy", "/admin/settings"],
             ] as const
           ).map(([label, href]) => (
-            <button key={label} type="button" onClick={() => navigate(href)} className="rounded-lg border border-hairline bg-card px-2.5 py-1.5">
-              <Text variant="caption" className="font-medium text-ink">
-                {label}
-              </Text>
+            <button key={label} type="button" onClick={() => navigate(href)} className="rounded-lg border border-hairline bg-card px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink">
+              {label}
             </button>
           ))}
         </div>
@@ -221,23 +225,23 @@ function Stat({
 }) {
   const body = (
     <div
-      className="min-w-[150px] flex-1 rounded-xl border p-3 text-left"
+      className="rounded-xl border p-3 text-left transition"
       style={{
         borderColor: tone === "navy" ? "rgba(32,43,78,0.2)" : tone === "red" ? "#FECACA" : colors.hairline,
-        backgroundColor: tone === "navy" ? "rgba(32,43,78,0.03)" : tone === "red" ? "rgba(254,242,242,0.6)" : colors.card,
+        backgroundColor: tone === "navy" ? "rgba(32,43,78,0.03)" : tone === "red" ? "rgba(254,242,242,0.5)" : colors.card,
       }}
     >
       <div className="flex flex-row items-center gap-1.5">
         <Icon size={14} color={colors.slate} />
         <Text variant="caption">{label}</Text>
       </div>
-      <div className="mt-0.5 text-[20px] font-bold" style={{ color: tone === "red" && value ? colors.destructive : colors.ink }}>
+      <div className="mt-0.5 text-xl font-bold" style={{ color: tone === "red" && value ? colors.destructive : colors.ink }}>
         {value}
       </div>
     </div>
   );
   return onPress ? (
-    <button type="button" onClick={onPress} className="min-w-[150px] flex-1">
+    <button type="button" onClick={onPress} className="text-left">
       {body}
     </button>
   ) : (

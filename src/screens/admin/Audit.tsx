@@ -24,7 +24,7 @@ export default function Audit() {
 
   return (
     <AdminGuard>
-      <Screen maxWidth={680}>
+      <Screen>
         <PageHeader title="Audit trail" subtitle="Every state-changing action in your workspace." />
         <Select label="Filter by action" value={filter} options={types.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))} onChange={setFilter} allowClear placeholder="All actions" />
         {rows.length === 0 ? (

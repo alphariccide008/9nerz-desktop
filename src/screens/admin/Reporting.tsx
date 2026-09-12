@@ -1,14 +1,13 @@
 import { useMemo } from "react";
-import { Avatar } from "../../components/ui/Avatar";
-import { Screen, PageHeader } from "../../components/ui/Screen";
+import { Network } from "lucide-react";
+import { Screen } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
-import { Select } from "../../components/ui/Select";
 import { useToast } from "../../components/ui/Toast";
 import { AdminGuard } from "../../components/admin/AdminGuard";
 import { useCurrentUser } from "../../lib/hooks";
 import { useDB } from "../../lib/db/store";
 import { listMembers, patchMember, MemberView } from "../../lib/services/org";
+import { colors } from "../../lib/theme";
 
 type Node = MemberView & { reports: Node[] };
 
@@ -41,27 +40,33 @@ export default function Reporting() {
 
   const Row = ({ n, depth }: { n: Node; depth: number }) => (
     <div>
-      <div className="flex flex-row items-center gap-2 py-2" style={{ paddingLeft: depth * 16 }}>
-        <Avatar name={`${n.firstName} ${n.lastName}`} size="sm" />
+      <div className="flex flex-row items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-background" style={{ marginLeft: depth * 16 }}>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-ink">
+          {n.firstName[0]}
+          {n.lastName[0] || ""}
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium text-ink">
+          <p className="truncate text-sm font-medium text-ink">
             {n.firstName} {n.lastName}
-            {n.isCompanyAdmin ? <span className="text-teal"> · admin</span> : null}
-          </div>
-          <Text variant="caption" className="block truncate">
+            {n.isCompanyAdmin ? <span className="ml-1.5 rounded bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-white">admin</span> : null}
+          </p>
+          <p className="truncate text-[11px] text-muted-foreground">
             {n.roleName ?? "no role"}
             {n.primaryUnitName ? ` · ${n.primaryUnitName}` : ""}
-          </Text>
+          </p>
         </div>
-        <div className="w-40 shrink-0">
-          <Select
-            value={n.reportsToUserId}
-            options={members.filter((o) => o.id !== n.id).map((o) => ({ value: o.id, label: `${o.firstName} ${o.lastName}` }))}
-            onChange={(v) => setManager(n.id, v)}
-            placeholder="reports to: —"
-            allowClear
-          />
-        </div>
+        <select
+          value={n.reportsToUserId ?? ""}
+          onChange={(e) => setManager(n.id, e.target.value)}
+          className="ml-auto shrink-0 rounded border border-hairline bg-card px-1.5 py-1 text-xs text-ink outline-none focus:border-ink"
+        >
+          <option value="">reports to: —</option>
+          {members.filter((o) => o.id !== n.id).map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.firstName} {o.lastName}
+            </option>
+          ))}
+        </select>
       </div>
       {n.reports.map((c) => (
         <Row key={c.id} n={c} depth={depth + 1} />
@@ -71,13 +76,24 @@ export default function Reporting() {
 
   return (
     <AdminGuard>
-      <Screen maxWidth={720}>
-        <PageHeader title="Reporting lines" subtitle="Who reports to whom. Rank and cycle checks are enforced." />
-        <Card className="p-3">
-          {roots.map((n) => (
-            <Row key={n.id} n={n} depth={0} />
-          ))}
-        </Card>
+      <Screen>
+        <div>
+          <h1 className="flex flex-row items-center gap-2 font-display text-lg font-bold text-ink">
+            <Network size={18} color={colors.ink} /> Reporting lines
+          </h1>
+          <Text variant="caption" className="mt-0.5 block">
+            Who reports to whom. Change a manager from the dropdown on each row.
+          </Text>
+        </div>
+        <div className="rounded-xl border border-hairline bg-card p-3">
+          {members.length === 0 ? (
+            <Text variant="caption" className="block p-6 text-center">
+              No people yet.
+            </Text>
+          ) : (
+            roots.map((n) => <Row key={n.id} n={n} depth={0} />)
+          )}
+        </div>
       </Screen>
     </AdminGuard>
   );

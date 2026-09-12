@@ -32,7 +32,7 @@ export default function TasksIndex() {
   if (!me) return null;
 
   return (
-    <Screen maxWidth={760}>
+    <Screen>
       <PageHeader title="Tasks" right={<Button title="New task" size="sm" icon={<Plus size={15} color={colors.white} />} onPress={() => navigate("/tasks/new")} />} />
       <Segmented options={TABS} value={tab} onChange={setTab} />
 

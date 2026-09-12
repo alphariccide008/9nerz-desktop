@@ -1,18 +1,24 @@
 import { useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Mail, ShieldAlert, ShieldCheck } from "lucide-react";
 
-import { Screen, PageHeader } from "../../components/ui/Screen";
+import { Screen } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
-import { Badge } from "../../components/ui/Badge";
 import { Loading } from "../../components/ui/Feedback";
-import { KeyValueList, KeyValueRow } from "../../components/ui/KeyValue";
 import { useDB } from "../../lib/db/store";
 import { userDetail } from "../../lib/services/superAdmin";
 import { fullName, relativeTime, shortDate } from "../../lib/util";
+import { colors } from "../../lib/theme";
+
+const STATUS_BADGE: Record<string, string> = {
+  active: "bg-teal/15 text-teal",
+  invited: "bg-amber/20 text-[#8a5a12]",
+  inactive: "bg-muted text-slate",
+};
 
 export default function SaUserDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const tick = useDB((db) => JSON.stringify(db.users.find((u) => u.id === id)));
   const data = useMemo(() => {
     try {
@@ -30,36 +36,74 @@ export default function SaUserDetail() {
   );
   const { user, company, role, assignedTasks, recentActivity } = data;
 
+  const fields: [string, string][] = [
+    ["Company", company?.name ?? "—"],
+    ["Role", role ?? "—"],
+    ["Joined", shortDate(user.createdAt)],
+    ["Last login", user.lastLoginAt ? relativeTime(user.lastLoginAt) : "—"],
+    ["Last active", user.lastActiveAt ? relativeTime(user.lastActiveAt) : "—"],
+    ["Assigned tasks", String(assignedTasks)],
+  ];
+
   return (
-    <Screen maxWidth={620}>
-      <PageHeader title={fullName(user)} subtitle={user.email} />
-      <div className="flex flex-row gap-2">
-        <Badge label={user.status} className={user.status === "active" ? "bg-teal/15" : "bg-muted"} />
-        {user.isCompanyAdmin ? <Badge label="admin" className="bg-ink" textClassName="text-white" /> : null}
+    <Screen>
+      <button
+        type="button"
+        onClick={() => (company ? navigate(`/sa/companies/${company.id}`) : navigate("/sa/companies"))}
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-ink"
+      >
+        <ArrowLeft size={13} /> {company ? company.name : "Companies"}
+      </button>
+
+      <div>
+        <div className="flex flex-row items-center gap-2">
+          <h1 className="font-display text-lg font-bold text-ink">{fullName(user)}</h1>
+          <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold capitalize ${STATUS_BADGE[user.status] ?? ""}`}>{user.status}</span>
+          {user.isCompanyAdmin ? <span className="rounded bg-ink px-1.5 py-0.5 text-[11px] font-semibold text-white">Company admin</span> : null}
+        </div>
+        <p className="mt-1 flex flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+          <Mail size={13} />
+          <span className="break-all">{user.email}</span>
+          {user.isEmailVerified ? (
+            <span className="inline-flex items-center gap-1 text-teal">
+              <ShieldCheck size={13} /> verified
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1" style={{ color: colors.amber }}>
+              <ShieldAlert size={13} /> unverified
+            </span>
+          )}
+        </p>
       </div>
-      <KeyValueList>
-        <KeyValueRow label="Company" value={company?.name ?? "—"} />
-        <KeyValueRow label="Role" value={role ?? "—"} />
-        <KeyValueRow label="Assigned tasks" value={assignedTasks} />
-        <KeyValueRow label="Email verified" value={user.isEmailVerified ? "Yes" : "No"} />
-        <KeyValueRow label="Last active" value={user.lastActiveAt ? relativeTime(user.lastActiveAt) : "—"} />
-        <KeyValueRow label="Joined" value={shortDate(user.createdAt)} last />
-      </KeyValueList>
-      <Text variant="heading">Recent activity</Text>
-      <Card>
-        {recentActivity.length === 0 ? (
-          <Text variant="caption" className="block p-4 text-center">
-            No recorded activity.
-          </Text>
-        ) : (
-          recentActivity.map((a, i) => (
-            <div key={a.id} className={`flex flex-row items-center gap-3 px-4 py-2 ${i > 0 ? "border-t border-hairline/60" : ""}`}>
-              <span className="flex-1 truncate text-[12px] capitalize text-ink">{a.actionType.replace(/_/g, " ")}</span>
-              <Text variant="caption">{relativeTime(a.createdAt)}</Text>
-            </div>
-          ))
-        )}
-      </Card>
+
+      <section className="grid gap-3 rounded-xl border border-hairline bg-card p-4 sm:grid-cols-2 lg:grid-cols-3">
+        {fields.map(([label, val]) => (
+          <div key={label}>
+            <Text variant="caption">{label}</Text>
+            <p className="text-sm font-medium text-ink">{val}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="rounded-xl border border-hairline bg-card">
+        <header className="border-b border-hairline px-4 py-3">
+          <Text variant="heading">Recent activity</Text>
+        </header>
+        <div className="max-h-80 divide-y divide-hairline overflow-y-auto">
+          {recentActivity.length === 0 ? (
+            <Text variant="caption" className="block px-4 py-6 text-center">
+              No recorded activity.
+            </Text>
+          ) : (
+            recentActivity.map((a) => (
+              <div key={a.id} className="flex flex-row items-center justify-between gap-3 px-4 py-2">
+                <span className="min-w-0 truncate text-xs capitalize text-ink">{a.actionType.replace(/_/g, " ")}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">{new Date(a.createdAt).toLocaleString()}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </Screen>
   );
 }

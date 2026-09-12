@@ -34,7 +34,7 @@ export default function Notifications() {
   };
 
   return (
-    <Screen maxWidth={640}>
+    <Screen maxWidth={860}>
       <PageHeader
         title="Notifications"
         subtitle={unread > 0 ? `${unread} unread` : "All caught up."}

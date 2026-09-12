@@ -99,7 +99,7 @@ export default function AdminSettings() {
 
   return (
     <AdminGuard>
-      <Screen maxWidth={620}>
+      <Screen maxWidth={840}>
         <PageHeader title="Permission policy" subtitle="These rules decide what managers can do without an admin. Admins always bypass them." />
 
         {RADIO_FIELDS.map((f) => (

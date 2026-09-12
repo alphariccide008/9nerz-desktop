@@ -105,7 +105,7 @@ export default function TicketDetail() {
   };
 
   return (
-    <Screen maxWidth={640}>
+    <Screen maxWidth={900}>
       <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
       <input ref={pdfInput} type="file" accept="application/pdf" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
 

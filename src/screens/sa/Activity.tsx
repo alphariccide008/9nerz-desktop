@@ -11,7 +11,7 @@ export default function SaActivity() {
   const feed = useMemo(() => activityFeed(), [tick]);
 
   return (
-    <Screen maxWidth={720}>
+    <Screen>
       <PageHeader title="Activity" subtitle="Live cross-company action feed." />
       <Card>
         {feed.map((f, i) => (

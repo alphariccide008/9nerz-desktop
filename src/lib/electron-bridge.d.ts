@@ -11,6 +11,7 @@ declare global {
       notify(title: string, body: string): Promise<void>;
       openExternal(url: string): Promise<void>;
       appVersion(): Promise<string>;
+      setBadge(dataUrl: string | null, description?: string): Promise<void>;
     };
   }
 }

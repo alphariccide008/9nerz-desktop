@@ -112,7 +112,7 @@ export default function Structure() {
 
   return (
     <AdminGuard>
-      <Screen maxWidth={640}>
+      <Screen>
         <PageHeader
           title="Structure"
           subtitle="Business units and departments — nest them however your company works."

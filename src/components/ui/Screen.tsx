@@ -3,21 +3,25 @@ import { RefreshCw } from "lucide-react";
 import { Text } from "./Text";
 import { cn } from "../../lib/cn";
 
-/** Standard scrollable page body, width-clamped and centered like the web/mobile layout. */
+/** Standard scrollable page body. Pass maxWidth="none" for a full-width desktop layout (dashboards, grids);
+ *  a number width-clamps and centers the content, appropriate for forms and narrow settings pages. */
 export function Screen({
   children,
-  maxWidth = 960,
+  maxWidth = 1200,
   className,
   contentClassName,
 }: {
   children: ReactNode;
-  maxWidth?: number;
+  maxWidth?: number | "none";
   className?: string;
   contentClassName?: string;
 }) {
   return (
     <div className={cn("h-full flex-1 overflow-y-auto bg-background", className)}>
-      <div className={cn("mx-auto flex w-full flex-col gap-4 px-6 py-6", contentClassName)} style={{ maxWidth }}>
+      <div
+        className={cn("mx-auto flex w-full flex-col gap-4 px-8 py-6", contentClassName)}
+        style={maxWidth === "none" ? undefined : { maxWidth }}
+      >
         {children}
       </div>
     </div>

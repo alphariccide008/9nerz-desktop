@@ -15,3 +15,59 @@ body {
   from { opacity: 0; transform: translateY(-12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Brand utilities — ported verbatim from the 9nerz web app's globals.css */
+
+.bg-brand-gradient {
+  background: linear-gradient(135deg, #202b4e 0%, #1f7a66 100%);
+}
+
+.text-brand-gradient {
+  background: linear-gradient(135deg, #202b4e, #1f7a66);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(32, 43, 78, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(32, 43, 78, 0.05) 1px, transparent 1px);
+  background-size: 46px 46px;
+}
+
+.bg-grid-light {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 46px 46px;
+}
+
+.card-hover {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px -3px rgba(32, 43, 78, 0.09), 0 2px 6px -2px rgba(32, 43, 78, 0.06);
+  border-color: rgba(32, 43, 78, 0.22);
+}
+
+@keyframes aurora-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(60px, 40px) scale(1.12); }
+}
+@keyframes aurora-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-50px, -30px) scale(1.15); }
+}
+
+@keyframes slide-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes preloader-bar {
+  0%   { width: 0%;   left: 0%; }
+  50%  { width: 65%;  left: 18%; }
+  100% { width: 0%;   left: 100%; }
+}

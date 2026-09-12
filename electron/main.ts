@@ -50,8 +50,23 @@ ipcMain.handle("nerz:notify", (_e, title: string, body: string) => {
 ipcMain.handle("nerz:openExternal", (_e, url: string) => shell.openExternal(url));
 ipcMain.handle("nerz:appVersion", () => app.getVersion());
 
+ipcMain.handle("nerz:setBadge", (_e, dataUrl: string | null, description?: string) => {
+  if (!mainWindow) return;
+  if (!dataUrl) {
+    mainWindow.setOverlayIcon(null, "");
+    if (tray) tray.setToolTip("9nerz");
+    return;
+  }
+  const img = nativeImage.createFromDataURL(dataUrl);
+  mainWindow.setOverlayIcon(img, description ?? "Unread notifications");
+  if (tray) tray.setToolTip(description ? `9nerz — ${description}` : "9nerz");
+});
+
 function iconPath() {
-  return path.join(__dirname, isDev ? "../build/icon.png" : "../../build/icon.png");
+  // Dev: __dirname is dist/electron, so climb to the project root's build/ folder.
+  // Packaged: build/icon.png is copied to the resources root via extraResources.
+  if (isDev) return path.join(__dirname, "../../build/icon.png");
+  return path.join(process.resourcesPath, "icon.png");
 }
 
 function createWindow() {

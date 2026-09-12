@@ -12,7 +12,7 @@ export default function SaSubscriptions() {
   const rows = useMemo(() => listAllSubscriptions(), [tick]);
 
   return (
-    <Screen maxWidth={720}>
+    <Screen>
       <PageHeader title="Subscriptions" subtitle="Tier and status per company." />
       <Card>
         {rows.map((s, i) => (
