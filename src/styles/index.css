@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  /* Matches the real web app's root font-size exactly (its globals.css sets
+     this too) — every rem-based Tailwind utility (padding, gaps, text sizes,
+     radii) scales off this, so this one line is what makes spacing/sizing
+     actually match the web app instead of just looking similar. */
+  font-size: 15px;
+}
+
 html, body, #root {
   height: 100%;
 }
@@ -9,6 +17,10 @@ html, body, #root {
 body {
   background: #F5F6F8;
   color: #202B4E;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 @keyframes toast-in {
