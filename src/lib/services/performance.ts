@@ -44,7 +44,10 @@ export interface PerformanceOverview {
 }
 
 function rowFor(db: ReturnType<typeof getDB>, userId: string): PerformanceRow {
-  const u = userById(db, userId)!;
+  const u = userById(db, userId);
+  // A real (backend-authenticated) account has no row here yet — task/performance
+  // data is still local-mock only pending a later migration pass.
+  if (!u) return { userId, name: "", unitId: null, unitName: null, completed: 0, onTime: 0, late: 0, otdScore: null };
   const finished = db.tasks.filter((t) => t.assigneeId === userId && DONE_STATUSES.includes(t.status) && t.dueDate);
   const onTime = finished.filter((t) => t.completedAt && t.dueDate && new Date(t.completedAt) <= new Date(t.dueDate)).length;
   const completed = finished.length;

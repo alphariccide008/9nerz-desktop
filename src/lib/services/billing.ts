@@ -25,7 +25,26 @@ export function foundingRateAvailable(): boolean {
 
 export function getSubscription(companyId: string): Subscription {
   const s = getDB().subscriptions.find((x) => x.companyId === companyId);
-  if (!s) throw new ServiceError("No subscription", "not_found");
+  // A real (backend-authenticated) company has no row here yet — billing is
+  // still local-mock only pending a later migration pass — so fall back to
+  // the same free-tier default a fresh signup gets, rather than throwing.
+  if (!s) {
+    const now = nowISO();
+    return {
+      id: "",
+      companyId,
+      tier: "free",
+      planId: "free",
+      status: "active",
+      provider: null,
+      trialEndsAt: null,
+      isFoundingSub: false,
+      currentPeriodEnd: null,
+      graceEndsAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
   return s;
 }
 

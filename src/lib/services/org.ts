@@ -118,7 +118,23 @@ export function listRoles(companyId: string): RoleView[] {
 
 export function getPolicy(companyId: string): PermissionPolicy {
   const p = getDB().permissionPolicies.find((x) => x.companyId === companyId);
-  if (!p) throw new ServiceError("Policy not found", "not_found");
+  // A real (backend-authenticated) company has no row here yet — permission
+  // policy is still local-mock only pending a later migration pass — so fall
+  // back to the same defaults a fresh signup gets, rather than throwing.
+  if (!p) {
+    const now = nowISO();
+    return {
+      id: "",
+      companyId,
+      inviteScope: "own_unit_and_subunits",
+      inviteRankCeiling: "below_own",
+      reportingChangeScope: "own_unit",
+      approvalRequiredFor: ["cross_unit_move"],
+      slaHours: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
   return p;
 }
 
@@ -133,7 +149,10 @@ export interface ChainView {
 export function reportingChainView(userId: string): ChainView {
   const db = getDB();
   const me = userById(db, userId);
-  if (!me) throw new ServiceError("User not found", "not_found");
+  // A real (backend-authenticated) account has no row here yet — org data is
+  // still local-mock only pending a later migration pass — so this is a normal,
+  // expected "nothing yet" state, not an error.
+  if (!me) return { user: { id: userId, name: "", role: null }, chain: [], directReports: [] };
   const roleName = (u: User | undefined) => (u ? roleOf(db, u)?.name ?? null : null);
   return {
     user: { id: me.id, name: fullName(me), role: roleName(me) },
