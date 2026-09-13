@@ -1,10 +1,21 @@
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { hydrate } from "./lib/db/store";
-import { loadSession } from "./lib/session";
+import { loadSession, useSession } from "./lib/session";
 import { ToastProvider } from "./components/ui/Toast";
 import Splash from "./screens/Splash";
+
+/** Welcome/Login/Signup are for logged-out visitors only — a returning user
+ *  with a valid session should land straight on their dashboard, not see the
+ *  marketing page or sign-in form again on every launch (mirrors the real web
+ *  app's middleware, which redirects logged-in users away from these same
+ *  routes). */
+function PublicOnly({ children }: { children: ReactNode }) {
+  const { userId } = useSession();
+  if (userId) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
 
 import AppLayout from "./layouts/AppLayout";
 import SaLayout from "./layouts/SaLayout";
@@ -50,6 +61,11 @@ import SaChat from "./screens/sa/Chat";
 import SaOperations from "./screens/sa/Operations";
 import SaSupport from "./screens/sa/Support";
 
+function RootRedirect() {
+  const { userId } = useSession();
+  return <Navigate to={userId ? "/dashboard" : "/welcome"} replace />;
+}
+
 export default function App() {
   const [ready, setReady] = useState(false);
 
@@ -64,10 +80,10 @@ export default function App() {
     <ToastProvider>
       <HashRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/welcome" replace />} />
-          <Route path="/welcome" element={<Welcome />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/welcome" element={<PublicOnly><Welcome /></PublicOnly>} />
+          <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+          <Route path="/signup" element={<PublicOnly><Signup /></PublicOnly>} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
@@ -109,7 +125,7 @@ export default function App() {
             <Route path="/sa/support" element={<SaSupport />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/welcome" replace />} />
+          <Route path="*" element={<RootRedirect />} />
         </Routes>
       </HashRouter>
     </ToastProvider>
