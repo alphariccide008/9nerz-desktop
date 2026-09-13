@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Award, Building2, ChevronRight, ListChecks, Network, Users, type LucideIcon } from "lucide-react";
 
@@ -10,9 +10,10 @@ import { EmptyState } from "../components/ui/Feedback";
 import { Donut } from "../components/ui/Donut";
 import { useCurrentUser, useIsAdmin } from "../lib/hooks";
 import { useDB } from "../lib/db/store";
+import { useSession } from "../lib/session";
 import { reportingChainView } from "../lib/services/org";
 import { listTasks } from "../lib/services/tasks";
-import { performanceOverview } from "../lib/services/performance";
+import { performanceOverview, fetchRealPerformance, RealPerformance } from "../lib/services/performance";
 import { shortDate } from "../lib/util";
 import { colors } from "../lib/theme";
 
@@ -20,7 +21,20 @@ export default function Dashboard() {
   const me = useCurrentUser();
   const isAdmin = useIsAdmin();
   const navigate = useNavigate();
+  const { real } = useSession();
   const dbTick = useDB((db) => db.tasks.length + db.users.length + db.auditLogs.length);
+
+  const [realPerf, setRealPerf] = useState<RealPerformance | null>(null);
+  useEffect(() => {
+    if (!real) return;
+    let cancelled = false;
+    fetchRealPerformance()
+      .then((p) => !cancelled && setRealPerf(p))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [real?.user.id]);
 
   const data = useMemo(() => {
     if (!me) return null;
@@ -151,91 +165,95 @@ export default function Dashboard() {
         </section>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {isAdmin ? (
-          <Card className="flex flex-row flex-wrap items-center gap-5 p-4">
-            <div className="flex flex-col items-center gap-1">
-              <Donut value={performance.companyOtd} tone={colors.ink} />
-              <Text variant="caption">Company</Text>
-            </div>
-            <div className="min-w-0 flex-1">
-              <Text variant="heading">Everyone · on-time delivery</Text>
-              <Text variant="caption" className="block">
-                Every person in the company, ranked
-              </Text>
-            </div>
-            {performance.topPerformer ? (
-              <div className="flex flex-row items-center gap-1">
-                <Award size={13} color={colors.amber} />
-                <Text variant="caption" className="font-medium text-ink">
-                  Top: {performance.topPerformer.name} ({performance.topPerformer.otdScore}%)
+      {real ? (
+        <RealPerformanceSection perf={realPerf} navigate={navigate} />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {isAdmin ? (
+            <Card className="flex flex-row flex-wrap items-center gap-5 p-4">
+              <div className="flex flex-col items-center gap-1">
+                <Donut value={performance.companyOtd} tone={colors.ink} />
+                <Text variant="caption">Company</Text>
+              </div>
+              <div className="min-w-0 flex-1">
+                <Text variant="heading">Everyone · on-time delivery</Text>
+                <Text variant="caption" className="block">
+                  Every person in the company, ranked
                 </Text>
               </div>
-            ) : null}
-          </Card>
-        ) : (
-          <Card className="flex flex-row flex-wrap items-center gap-5 p-4">
-            <Donut value={performance.me.otdScore} />
-            <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-              <div>
-                <dt className="text-[11px] text-muted-foreground">Delivered</dt>
-                <dd className="font-semibold tabular-nums text-ink">{performance.me.completed}</dd>
-              </div>
-              <div>
-                <dt className="text-[11px] text-muted-foreground">On time</dt>
-                <dd className="font-semibold tabular-nums text-teal">{performance.me.onTime}</dd>
-              </div>
-              <div>
-                <dt className="text-[11px] text-muted-foreground">Late</dt>
-                <dd className="font-semibold tabular-nums text-destructive">{performance.me.late}</dd>
-              </div>
-              <div>
-                <dt className="text-[11px] text-muted-foreground">Score</dt>
-                <dd className="font-semibold text-ink">{performance.me.otdScore == null ? "—" : `${performance.me.otdScore}%`}</dd>
-              </div>
-            </dl>
-          </Card>
-        )}
-
-        {isAdmin && performance.individuals.length > 0 ? (
-          <Card>
-            <header className="border-b border-hairline px-4 py-2.5">
-              <Text variant="heading">Leaderboard</Text>
-            </header>
-            <div className="divide-y divide-hairline/60">
-              {performance.individuals.slice(0, 8).map((p, i) => (
-                <div key={p.userId} className="flex flex-row items-center gap-3 px-4 py-2">
-                  <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{p.name}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{p.completed} done</span>
-                  <span className="w-12 shrink-0 text-right text-sm font-semibold text-ink">{p.otdScore == null ? "—" : `${p.otdScore}%`}</span>
+              {performance.topPerformer ? (
+                <div className="flex flex-row items-center gap-1">
+                  <Award size={13} color={colors.amber} />
+                  <Text variant="caption" className="font-medium text-ink">
+                    Top: {performance.topPerformer.name} ({performance.topPerformer.otdScore}%)
+                  </Text>
                 </div>
-              ))}
-            </div>
-          </Card>
-        ) : null}
+              ) : null}
+            </Card>
+          ) : (
+            <Card className="flex flex-row flex-wrap items-center gap-5 p-4">
+              <Donut value={performance.me.otdScore} />
+              <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+                <div>
+                  <dt className="text-[11px] text-muted-foreground">Delivered</dt>
+                  <dd className="font-semibold tabular-nums text-ink">{performance.me.completed}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-muted-foreground">On time</dt>
+                  <dd className="font-semibold tabular-nums text-teal">{performance.me.onTime}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-muted-foreground">Late</dt>
+                  <dd className="font-semibold tabular-nums text-destructive">{performance.me.late}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-muted-foreground">Score</dt>
+                  <dd className="font-semibold text-ink">{performance.me.otdScore == null ? "—" : `${performance.me.otdScore}%`}</dd>
+                </div>
+              </dl>
+            </Card>
+          )}
 
-        {isAdmin && performance.units.length > 0 ? (
-          <div>
-            <Text variant="heading" className="mb-2 block">
-              Unit performance
-            </Text>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {performance.units.map((u) => (
-                <Card key={u.unitId} className="flex flex-row items-center gap-3 p-3">
-                  <Donut value={u.otdScore} size={44} strokeWidth={5} />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-ink">{u.unitName}</p>
-                    <Text variant="caption">{u.completed} completed</Text>
+          {isAdmin && performance.individuals.length > 0 ? (
+            <Card>
+              <header className="border-b border-hairline px-4 py-2.5">
+                <Text variant="heading">Leaderboard</Text>
+              </header>
+              <div className="divide-y divide-hairline/60">
+                {performance.individuals.slice(0, 8).map((p, i) => (
+                  <div key={p.userId} className="flex flex-row items-center gap-3 px-4 py-2">
+                    <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{p.name}</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{p.completed} done</span>
+                    <span className="w-12 shrink-0 text-right text-sm font-semibold text-ink">{p.otdScore == null ? "—" : `${p.otdScore}%`}</span>
                   </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
 
-      {isAdmin ? (
+          {isAdmin && performance.units.length > 0 ? (
+            <div>
+              <Text variant="heading" className="mb-2 block">
+                Unit performance
+              </Text>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {performance.units.map((u) => (
+                  <Card key={u.unitId} className="flex flex-row items-center gap-3 p-3">
+                    <Donut value={u.otdScore} size={44} strokeWidth={5} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink">{u.unitName}</p>
+                      <Text variant="caption">{u.completed} completed</Text>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {!real && isAdmin ? (
         <div className="flex flex-row flex-wrap gap-2">
           {(
             [
@@ -293,5 +311,160 @@ function Stat({
     </button>
   ) : (
     body
+  );
+}
+
+/** Real-backend performance, matching the web app's dashboard-home.tsx layout:
+ *  org-wide pie (admin), leaderboard or personal card, department + business-unit
+ *  grids, and one donut per person. Data and ranking come straight from
+ *  GET /api/org/performance — nothing here is recomputed locally. */
+function RealPerformanceSection({ perf, navigate }: { perf: RealPerformance | null; navigate: (path: string) => void }) {
+  if (!perf) {
+    return (
+      <Card className="p-4">
+        <Text variant="caption">Loading performance…</Text>
+      </Card>
+    );
+  }
+
+  const award = perf.people.find((p) => p.id === perf.awardUserId) ?? null;
+  const departments = perf.byUnit.filter((u) => u.type === "department");
+  const businessUnits = perf.byUnit.filter((u) => u.type === "business_unit");
+
+  return (
+    <div className="flex flex-col gap-4">
+      {perf.isAdmin && perf.org ? (
+        <Card className="flex flex-row flex-wrap items-center gap-5 p-4">
+          <div className="flex flex-col items-center gap-1">
+            <Donut value={perf.org.score} tone={colors.ink} />
+            <Text variant="caption">Company · {perf.org.headcount}</Text>
+          </div>
+          <div className="min-w-0 flex-1">
+            <Text variant="heading">Everyone · on-time delivery</Text>
+            <Text variant="caption" className="block">
+              Every person in the company, ranked · last {perf.windowDays} days
+            </Text>
+          </div>
+        </Card>
+      ) : null}
+
+      {perf.people.length > 0 ? (
+        <Card>
+          <header className="flex flex-row items-center justify-between border-b border-hairline px-4 py-2.5">
+            <Text variant="heading">{perf.isAdmin ? "Everyone · on-time delivery" : "Team performance"}</Text>
+            {award ? (
+              <div className="flex flex-row items-center gap-1">
+                <Award size={13} color={colors.amber} />
+                <Text variant="caption" className="font-medium text-ink">
+                  Top: {award.name} ({award.score}%)
+                </Text>
+              </div>
+            ) : null}
+          </header>
+          <div className="divide-y divide-hairline/60">
+            {perf.people.slice(0, 8).map((p) => (
+              <div key={p.id} className="flex flex-row items-center gap-3 px-4 py-2">
+                <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{p.rank ?? "—"}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-ink">{p.name}</span>
+                {p.role ? <span className="shrink-0 text-[11px] text-muted-foreground">{p.role}</span> : null}
+                <span className="shrink-0 text-[11px] text-muted-foreground">{p.delivered} done</span>
+                <span className="w-12 shrink-0 text-right text-sm font-semibold text-ink">{p.score == null ? "—" : `${p.score}%`}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : (
+        <Card className="flex flex-row flex-wrap items-center gap-5 p-4">
+          <Donut value={perf.me.score} />
+          <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+            <div>
+              <dt className="text-[11px] text-muted-foreground">Delivered</dt>
+              <dd className="font-semibold tabular-nums text-ink">{perf.me.delivered}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-muted-foreground">On time</dt>
+              <dd className="font-semibold tabular-nums text-teal">{perf.me.onTime}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-muted-foreground">Late</dt>
+              <dd className="font-semibold tabular-nums text-destructive">{perf.me.late}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-muted-foreground">Open &amp; overdue</dt>
+              <dd className="font-semibold text-ink">{perf.me.openOverdue}</dd>
+            </div>
+          </dl>
+        </Card>
+      )}
+
+      {departments.length > 0 ? (
+        <UnitGrid title="Department performance" units={departments} />
+      ) : null}
+      {businessUnits.length > 0 ? (
+        <UnitGrid title="Business unit performance" units={businessUnits} />
+      ) : null}
+
+      {perf.people.length > 0 ? (
+        <div>
+          <Text variant="heading" className="mb-2 block">
+            Individual performance
+          </Text>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {perf.people.map((p) => (
+              <Card key={p.id} className="flex flex-row items-center gap-3 p-3">
+                <Donut value={p.score} size={44} strokeWidth={5} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink">{p.name}</p>
+                  <Text variant="caption">{p.delivered} completed</Text>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {perf.isAdmin ? (
+        <div className="flex flex-row flex-wrap gap-2">
+          {(
+            [
+              ["Invite people", "/admin/people"],
+              ["Edit reporting lines", "/admin/reporting"],
+              ["Roles & ranks", "/admin/roles"],
+              ["Permission policy", "/admin/settings"],
+            ] as const
+          ).map(([label, href]) => (
+            <button key={label} type="button" onClick={() => navigate(href)} className="rounded-lg border border-hairline bg-card px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink">
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function UnitGrid({ title, units }: { title: string; units: RealPerformance["byUnit"] }) {
+  return (
+    <div>
+      <Text variant="heading" className="mb-2 block">
+        {title}
+      </Text>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {units
+          .slice()
+          .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
+          .map((u) => (
+            <Card key={u.id} className="flex flex-row items-center gap-3 p-3">
+              <Donut value={u.score} size={44} strokeWidth={5} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-ink">{u.name}</p>
+                <Text variant="caption">
+                  {u.delivered} completed · {u.memberCount} {u.memberCount === 1 ? "person" : "people"}
+                </Text>
+              </div>
+            </Card>
+          ))}
+      </div>
+    </div>
   );
 }

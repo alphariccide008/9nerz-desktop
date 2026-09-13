@@ -10,6 +10,48 @@ import { getDB } from "../db/store";
 import { Task } from "../db/schema";
 import { fullName } from "../util";
 import { userById, primaryUnitId } from "./helpers";
+import { apiRequest } from "../api/http";
+import { getAccessToken } from "../session";
+
+export interface PersonStat {
+  id: string;
+  name: string;
+  role: string | null;
+  total: number;
+  delivered: number;
+  onTime: number;
+  late: number;
+  openOverdue: number;
+  declined: number;
+  score: number | null;
+  avgDaysLate: number | null;
+  rank: number | null;
+}
+export interface UnitStat extends Omit<PersonStat, "role" | "rank"> {
+  type: string;
+  parentUnitId: string | null;
+  memberCount: number;
+  people: PersonStat[];
+  topPerformerId: string | null;
+  rank: number | null;
+}
+export interface RealPerformance {
+  windowDays: number;
+  generatedAt: string;
+  isAdmin: boolean;
+  me: Omit<PersonStat, "role" | "rank">;
+  people: PersonStat[];
+  awardUserId: string | null;
+  org: (Omit<PersonStat, "role" | "rank" | "id" | "name"> & { headcount: number; departments: { id: string; name: string; score: number | null; delivered: number; onTime: number; rank: number | null }[] }) | null;
+  byUnit: UnitStat[];
+}
+
+/** The real backend's own OTD ranking (windowed, ranked, per-department/business-unit) —
+ *  fetched directly rather than reimplemented client-side, since the ranking rules
+ *  (tie-breaks, award threshold, per-unit-type ranking) are non-trivial to replicate exactly. */
+export async function fetchRealPerformance(days = 90): Promise<RealPerformance> {
+  return apiRequest<RealPerformance>("GET", `/api/org/performance?days=${days}`, undefined, getAccessToken());
+}
 
 const DONE_STATUSES: Task["status"][] = ["Completed", "Approved"];
 /** A user needs at least this many finished, due-dated tasks before they're eligible for "top performer". */
