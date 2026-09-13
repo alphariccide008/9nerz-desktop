@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LogOut, Sparkles } from "lucide-react";
 
 import { Wordmark } from "../brand/Logo";
 import { Text } from "../ui/Text";
@@ -9,6 +10,8 @@ import { colors } from "../../lib/theme";
 import { manageNav, NavItem, primaryNav } from "./nav";
 import { useAwaitingTicketCount, useCompany, useCurrentUser, useIsAdmin, useUnreadCount } from "../../lib/hooks";
 import { useDB } from "../../lib/db/store";
+import { useSession } from "../../lib/session";
+import { fetchRealPlanStatus, RealPlanStatus } from "../../lib/services/org";
 import { fullName } from "../../lib/util";
 import { logout } from "../../lib/services/auth";
 
@@ -48,6 +51,17 @@ export function SidebarContent() {
   const roleName = useDB((db) => db.roles.find((r) => r.id === db.users.find((u) => u.id === me?.id)?.roleId)?.name ?? null);
   const isActive = (href: string) => location.pathname === href || location.pathname.startsWith(href + "/");
 
+  const { real } = useSession();
+  const [plan, setPlan] = useState<RealPlanStatus | null>(null);
+  useEffect(() => {
+    if (!real) return;
+    let cancelled = false;
+    fetchRealPlanStatus().then((p) => !cancelled && setPlan(p));
+    return () => {
+      cancelled = true;
+    };
+  }, [real?.user.id]);
+
   const badgeFor = (href: string) =>
     href === "/notifications" ? (unread > 0 ? unread : undefined) : href === "/tickets" ? (awaitingTickets > 0 ? awaitingTickets : undefined) : undefined;
 
@@ -67,6 +81,25 @@ export function SidebarContent() {
               {company.name}
             </Text>
           ) : null}
+          {plan?.showUpgrade
+            ? (() => {
+                const urgent = !!plan.trialing && (plan.trialDaysLeft ?? 99) <= 3;
+                const label = plan.trialing ? `${plan.trialDaysLeft} day${plan.trialDaysLeft === 1 ? "" : "s"} left · Upgrade` : "Upgrade";
+                return (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/billing")}
+                    className={cn(
+                      "mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition hover:brightness-95",
+                      urgent ? "bg-destructive text-white" : "bg-amber text-ink",
+                    )}
+                  >
+                    <Sparkles size={13} />
+                    {label}
+                  </button>
+                );
+              })()
+            : null}
         </div>
       ) : null}
       <div className="flex-1 overflow-y-auto px-2 pb-3 pt-1">

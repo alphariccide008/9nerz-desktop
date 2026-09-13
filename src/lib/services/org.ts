@@ -53,6 +53,29 @@ export interface MemberView {
   lastActiveAt: string | null;
 }
 
+export interface RealPlanStatus {
+  tier: string;
+  effectiveTier: string;
+  trialing: boolean;
+  trialEndsAt: string | null;
+  trialDaysLeft: number | null;
+  isFounding: boolean;
+  billingStatus: string | null;
+  showUpgrade: boolean;
+}
+
+/** GET /api/org/me — drives the real web app's top-nav "Upgrade" CTA (free/trialing companies only, red in the last 3 trial days). */
+export async function fetchRealPlanStatus(): Promise<RealPlanStatus | null> {
+  const real = getSession().real;
+  if (!real) return null;
+  try {
+    const { plan } = await apiRequest<{ plan: RealPlanStatus }>("GET", "/api/org/me", undefined, getAccessToken());
+    return plan;
+  } catch {
+    return null;
+  }
+}
+
 export function listMembers(companyId: string): MemberView[] {
   const db = getDB();
   return db.users
