@@ -8,6 +8,9 @@
 import { getDB, mutate } from "../db/store";
 import { Attachment, AttachmentKind, TaskPriority, Ticket, TicketStatus, User } from "../db/schema";
 import { uid, nowISO, fullName } from "../util";
+import { apiRequest, ApiError } from "../api/http";
+import { getSession, getAccessToken } from "../session";
+import { syncRealTicketDetail, syncRealTickets } from "./ticketSync";
 import {
   ServiceError,
   writeAudit,
@@ -271,15 +274,29 @@ export function simulateInbound(
 
 // ── Actions ────────────────────────────────────────────────────────────────
 
-export function reply(
+export async function reply(
   actorId: string,
   ticketId: string,
   body: string,
   internal: boolean,
   attachments: NewAttachment[] = [],
-): void {
+): Promise<void> {
   const text = body.trim();
   if (!text && attachments.length === 0) return;
+
+  const real = getSession().real;
+  if (real) {
+    if (attachments.length) throw new ServiceError("Attachments aren't supported yet for real accounts — send the text, then attach separately once that's wired up.");
+    try {
+      await apiRequest("POST", `/api/tickets/${ticketId}/reply`, { body: text, internal }, getAccessToken());
+      await syncRealTicketDetail(ticketId);
+      await syncRealTickets();
+      return;
+    } catch (e) {
+      throw new ServiceError(e instanceof ApiError ? e.message : "Could not send.");
+    }
+  }
+
   mutate((d) => {
     const t = d.tickets.find((x) => x.id === ticketId);
     const actor = userById(d, actorId);
@@ -335,7 +352,19 @@ export function reply(
   });
 }
 
-export function setStatus(actorId: string, ticketId: string, status: TicketStatus): void {
+export async function setStatus(actorId: string, ticketId: string, status: TicketStatus): Promise<void> {
+  const real = getSession().real;
+  if (real) {
+    try {
+      await apiRequest("POST", `/api/tickets/${ticketId}/status`, { status }, getAccessToken());
+      await syncRealTicketDetail(ticketId);
+      await syncRealTickets();
+      return;
+    } catch (e) {
+      throw new ServiceError(e instanceof ApiError ? e.message : "Could not update status.");
+    }
+  }
+
   mutate((d) => {
     const t = d.tickets.find((x) => x.id === ticketId);
     if (!t) throw new ServiceError("Ticket not found", "not_found");
@@ -354,7 +383,19 @@ export function setStatus(actorId: string, ticketId: string, status: TicketStatu
   });
 }
 
-export function setPriority(actorId: string, ticketId: string, priority: Ticket["priority"]): void {
+export async function setPriority(actorId: string, ticketId: string, priority: Ticket["priority"]): Promise<void> {
+  const real = getSession().real;
+  if (real) {
+    try {
+      await apiRequest("PATCH", `/api/tickets/${ticketId}`, { priority }, getAccessToken());
+      await syncRealTicketDetail(ticketId);
+      await syncRealTickets();
+      return;
+    } catch (e) {
+      throw new ServiceError(e instanceof ApiError ? e.message : "Could not change priority.");
+    }
+  }
+
   mutate((d) => {
     const actor = userById(d, actorId);
     const t = d.tickets.find((x) => x.id === ticketId);
@@ -366,7 +407,19 @@ export function setPriority(actorId: string, ticketId: string, priority: Ticket[
   });
 }
 
-export function assign(actorId: string, ticketId: string, assigneeId: string | null): void {
+export async function assign(actorId: string, ticketId: string, assigneeId: string | null): Promise<void> {
+  const real = getSession().real;
+  if (real) {
+    try {
+      await apiRequest("POST", `/api/tickets/${ticketId}/assign`, { assigneeId }, getAccessToken());
+      await syncRealTicketDetail(ticketId);
+      await syncRealTickets();
+      return;
+    } catch (e) {
+      throw new ServiceError(e instanceof ApiError ? e.message : "Could not assign.");
+    }
+  }
+
   mutate((d) => {
     const t = d.tickets.find((x) => x.id === ticketId);
     if (!t) throw new ServiceError("Ticket not found", "not_found");
@@ -379,7 +432,19 @@ export function assign(actorId: string, ticketId: string, assigneeId: string | n
   });
 }
 
-export function moveQueue(actorId: string, ticketId: string, orgUnitId: string | null): void {
+export async function moveQueue(actorId: string, ticketId: string, orgUnitId: string | null): Promise<void> {
+  const real = getSession().real;
+  if (real) {
+    try {
+      await apiRequest("PATCH", `/api/tickets/${ticketId}`, { orgUnitId }, getAccessToken());
+      await syncRealTicketDetail(ticketId);
+      await syncRealTickets();
+      return;
+    } catch (e) {
+      throw new ServiceError(e instanceof ApiError ? e.message : "Could not move queue.");
+    }
+  }
+
   mutate((d) => {
     const actor = userById(d, actorId);
     const t = d.tickets.find((x) => x.id === ticketId);

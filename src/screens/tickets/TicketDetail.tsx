@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ArrowLeft, FileText, Mail, Paperclip, Send, StickyNote, X } from "lucide-react";
 
@@ -19,6 +19,8 @@ import { listUnits } from "../../lib/services/org";
 import { TicketStatus } from "../../lib/db/schema";
 import { humanSize, relativeTime } from "../../lib/util";
 import { colors } from "../../lib/theme";
+import { useSession } from "../../lib/session";
+import { syncRealTicketDetail } from "../../lib/services/ticketSync";
 
 const NEXT: Record<string, [TicketStatus, string][]> = {
   open: [["in_progress", "Start work"], ["resolved", "Resolve"]],
@@ -56,7 +58,13 @@ export default function TicketDetail() {
 export function TicketDetailContent({ ticketId: id, onClose }: { ticketId: string; onClose?: () => void }) {
   const modal = typeof onClose === "function";
   const me = useCurrentUser();
+  const { real } = useSession();
   const toast = useToast();
+
+  useEffect(() => {
+    if (!real) return;
+    syncRealTicketDetail(id);
+  }, [real, id]);
   const [draft, setDraft] = useState("");
   const [internal, setInternal] = useState(false);
   const [files, setFiles] = useState<NewAttachment[]>([]);
@@ -79,9 +87,9 @@ export function TicketDetailContent({ ticketId: id, onClose }: { ticketId: strin
 
   const { ticket, messages, canManage, canRespond, isAdmin, unitMembers } = view;
 
-  const act = (fn: () => void, msg: string) => {
+  const act = async (fn: () => unknown, msg: string) => {
     try {
-      fn();
+      await fn();
       toast.show(msg, "success");
     } catch (e) {
       toast.show(e instanceof Error ? e.message : "Failed", "error");
@@ -101,10 +109,10 @@ export function TicketDetailContent({ ticketId: id, onClose }: { ticketId: strin
     for (const f of Array.from(fileList)) addFile(await fileToAttachment(f));
   };
 
-  const send = () => {
+  const send = async () => {
     if (!draft.trim() && files.length === 0) return;
     try {
-      TK.reply(me.id, id, draft, internal, files);
+      await TK.reply(me.id, id, draft, internal, files);
       setDraft("");
       setFiles([]);
     } catch (e) {

@@ -1,6 +1,6 @@
 {
   "name": "9nerz-desktop",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "private": true,
   "description": "9nerz — Windows desktop client (Electron + React), ported from 9Nerz-mobile",
   "author": "9nerz",

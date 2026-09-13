@@ -8,6 +8,7 @@ import { ping } from "../lib/services/auth";
 import { syncRealOrgData } from "../lib/services/orgSync";
 import { syncRealMailbox } from "../lib/services/mailbox";
 import { syncRealTasks } from "../lib/services/taskSync";
+import { syncRealTickets } from "../lib/services/ticketSync";
 import { updateTaskbarBadge } from "../lib/badge";
 
 const SIDEBAR_W = 248;
@@ -60,7 +61,11 @@ export default function AppLayout() {
   useEffect(() => {
     if (!real) return;
     syncRealTasks();
-    const t = setInterval(() => syncRealTasks(), 20_000);
+    syncRealTickets();
+    const t = setInterval(() => {
+      syncRealTasks();
+      syncRealTickets();
+    }, 20_000);
     return () => clearInterval(t);
   }, [real?.user.id]);
 
