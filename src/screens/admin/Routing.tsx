@@ -107,7 +107,7 @@ export default function Routing() {
                   <span className="text-[13px] text-ink">{r.subjectPattern ? `subject ~ "${r.subjectPattern}"` : "any subject"}</span>
                   <ArrowRight size={13} color={colors.slate} />
                   <span className="text-[13px] font-medium text-ink">{r.orgUnitName}</span>
-                  <button type="button" className="ml-auto p-1" onClick={() => confirmAction("Delete rule?", "", () => wrap(() => deleteRoutingRule(me.id, r.id), "Deleted"), "Delete", true)}>
+                  <button type="button" className="ml-auto p-1" onClick={() => confirmAction("Delete this?", "", () => wrap(() => deleteRoutingRule(me.id, r.id), "Deleted"), "Delete", true)}>
                     <Trash2 size={13} color={colors.destructive} />
                   </button>
                 </div>

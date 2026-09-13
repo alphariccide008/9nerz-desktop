@@ -13,6 +13,7 @@ import { AdminGuard } from "../../components/admin/AdminGuard";
 import { useCurrentUser } from "../../lib/hooks";
 import { useDB } from "../../lib/db/store";
 import { createInvite, listInvites, listMembers, listRoles, listUnits, patchMember, revokeInvite } from "../../lib/services/org";
+import { confirmAction } from "../../lib/confirm";
 import { shortDate } from "../../lib/util";
 import { colors } from "../../lib/theme";
 
@@ -66,10 +67,12 @@ export default function People() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      revokeInvite(me.id, iv.id);
-                      toast.show("Invite revoked", "success");
-                    }}
+                    onClick={() =>
+                      confirmAction(`Revoke the invitation for ${iv.email}?`, "", () => {
+                        revokeInvite(me.id, iv.id);
+                        toast.show("Invite revoked", "success");
+                      })
+                    }
                     className="ml-auto rounded-md border border-hairline bg-card px-2 py-1 text-[11px] font-medium text-slate hover:border-destructive hover:text-destructive"
                   >
                     <X size={12} />

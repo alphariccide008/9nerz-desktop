@@ -106,7 +106,7 @@ export default function Roles() {
                     <td className="px-3 py-2 text-right text-muted-foreground">{r.memberCount}</td>
                     <td className="px-3 py-2 text-right">
                       {!r.isAdminRole ? (
-                        <button type="button" onClick={() => confirmAction("Delete role?", `"${r.name}"`, () => wrap(() => deleteRole(me.id, r.id), "Deleted"), "Delete", true)} className="rounded p-1 hover:bg-destructive/10">
+                        <button type="button" onClick={() => confirmAction(`Delete role "${r.name}"?`, "", () => wrap(() => deleteRole(me.id, r.id), "Deleted"), "Delete", true)} className="rounded p-1 hover:bg-destructive/10">
                           <Trash2 size={14} color={colors.destructive} />
                         </button>
                       ) : null}

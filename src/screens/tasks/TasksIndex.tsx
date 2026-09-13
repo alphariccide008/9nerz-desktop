@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Clock, Plus } from "lucide-react";
 
@@ -14,6 +14,7 @@ import { useDB } from "../../lib/db/store";
 import { listTasks, TaskScope } from "../../lib/services/tasks";
 import { fullName, isOverdue, shortDate } from "../../lib/util";
 import { colors } from "../../lib/theme";
+import { TaskDetailContent } from "./TaskDetail";
 
 const TABS: { value: TaskScope; label: string }[] = [
   { value: "mine", label: "My tasks" },
@@ -25,13 +26,24 @@ export default function TasksIndex() {
   const me = useCurrentUser();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TaskScope>("mine");
+  const [openId, setOpenId] = useState<string | null>(null);
   const tick = useDB((db) => db.tasks.map((t) => t.updatedAt).join(","));
 
   const tasks = useMemo(() => (me ? listTasks(me.id, tab) : []), [me, tab, tick]);
 
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openId]);
+
   if (!me) return null;
 
   return (
+    <>
     <Screen>
       <PageHeader title="Tasks" right={<Button title="New task" size="sm" icon={<Plus size={15} color={colors.white} />} onPress={() => navigate("/tasks/new")} />} />
       <Segmented options={TABS} value={tab} onChange={setTab} />
@@ -47,7 +59,7 @@ export default function TasksIndex() {
               <button
                 key={t.id}
                 type="button"
-                onClick={() => navigate(`/tasks/${t.id}`)}
+                onClick={() => setOpenId(t.id)}
                 className={`flex w-full flex-row items-center gap-3 px-4 py-3 text-left ${i > 0 ? "border-t border-hairline/60" : ""}`}
               >
                 <div className="min-w-0 flex-1">
@@ -76,5 +88,15 @@ export default function TasksIndex() {
         </Card>
       )}
     </Screen>
+
+    {openId ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(18,23,42,0.45)" }}>
+        <div className="absolute inset-0" onClick={() => setOpenId(null)} />
+        <div className="relative w-[96vw] max-w-[1152px] overflow-hidden rounded-2xl border border-hairline bg-card shadow-xl">
+          <TaskDetailContent taskId={openId} onClose={() => setOpenId(null)} />
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }

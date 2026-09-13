@@ -16,6 +16,7 @@ import { listTasks } from "../lib/services/tasks";
 import { performanceOverview, fetchRealPerformance, RealPerformance } from "../lib/services/performance";
 import { shortDate } from "../lib/util";
 import { colors } from "../lib/theme";
+import { TaskDetailContent } from "./tasks/TaskDetail";
 
 export default function Dashboard() {
   const me = useCurrentUser();
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const dbTick = useDB((db) => db.tasks.length + db.users.length + db.auditLogs.length);
 
   const [realPerf, setRealPerf] = useState<RealPerformance | null>(null);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   useEffect(() => {
     if (!real) return;
     let cancelled = false;
@@ -58,6 +60,7 @@ export default function Dashboard() {
   const { chain, mine, teamOverdue, performance } = data;
 
   return (
+    <>
     <Screen maxWidth="none">
       <div className="flex flex-row items-end justify-between">
         <div>
@@ -112,7 +115,7 @@ export default function Dashboard() {
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => navigate(`/tasks/${t.id}`)}
+                  onClick={() => setOpenTaskId(t.id)}
                   className="flex w-full flex-row items-center gap-2.5 px-4 py-2.5 text-left hover:bg-background"
                 >
                   <StatusDot status={t.status} />
@@ -272,6 +275,16 @@ export default function Dashboard() {
 
       {mine.length === 0 && teamOverdue.length === 0 && !isAdmin ? <EmptyState title="All quiet" body="New tasks assigned to you will show up here." /> : null}
     </Screen>
+
+    {openTaskId ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(18,23,42,0.45)" }}>
+        <div className="absolute inset-0" onClick={() => setOpenTaskId(null)} />
+        <div className="relative w-[96vw] max-w-[1152px] overflow-hidden rounded-2xl border border-hairline bg-card shadow-xl">
+          <TaskDetailContent taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
 

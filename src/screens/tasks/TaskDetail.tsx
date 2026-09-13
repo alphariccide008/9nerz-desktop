@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
+  ArrowLeft,
   CheckCircle2,
   FileText,
   Lock,
@@ -60,7 +61,20 @@ function fileToAttachment(file: File): Promise<NewTaskAttachment> {
 }
 
 export default function TaskDetail() {
-  const { id: taskId } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return (
+    <Screen maxWidth={900}>
+      <TaskDetailContent taskId={id} />
+    </Screen>
+  );
+}
+
+/** Task detail — used full-page (the /tasks/:id route, no `onClose`) and as the
+ *  content of the in-list popup (TasksIndex, Dashboard's "My tasks", with
+ *  `onClose`) — mirrors the real web app's dual-mode task-detail component. */
+export function TaskDetailContent({ taskId, onClose }: { taskId: string; onClose?: () => void }) {
+  const modal = typeof onClose === "function";
   const navigate = useNavigate();
   const me = useCurrentUser();
   const toast = useToast();
@@ -86,12 +100,8 @@ export default function TaskDetail() {
 
   const people = useMemo(() => (me ? assignableTo(me.id) : []), [me, tick]);
 
-  if (!me || !taskId) return null;
-  if (!task) return (
-    <Screen>
-      <Loading />
-    </Screen>
-  );
+  if (!me) return null;
+  if (!task) return <Loading />;
 
   const isAssignee = task.assigneeId === me.id;
   const isAssigner = task.assignerId === me.id || me.isCompanyAdmin;
@@ -133,11 +143,16 @@ export default function TaskDetail() {
     }
   };
 
-  return (
-    <Screen maxWidth={900}>
+  const body = (
+    <>
       <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
       <input ref={fileInput} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
 
+      {modal ? (
+        <button type="button" onClick={onClose} className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-ink">
+          <ArrowLeft size={14} /> Close
+        </button>
+      ) : null}
       <PageHeader title={task.title} />
 
       <div className="flex flex-row flex-wrap items-center gap-2">
@@ -272,7 +287,8 @@ export default function TaskDetail() {
                 confirmAction("Delete this task?", "This can't be undone.", () => {
                   try {
                     T.deleteTask(me.id, taskId);
-                    navigate(-1);
+                    if (modal) onClose?.();
+                    else navigate(-1);
                   } catch (e) {
                     toast.show(e instanceof Error ? e.message : "Could not delete", "error");
                   }
@@ -369,7 +385,11 @@ export default function TaskDetail() {
           ))}
         </div>
       </div>
+    </>
+  );
 
+  const overlays = (
+    <>
       <Sheet
         visible={!!prompt}
         onClose={() => setPrompt(null)}
@@ -438,6 +458,22 @@ export default function TaskDetail() {
           <Input label="Description" value={edit.description} onChange={(e) => setEdit((s) => ({ ...s, description: e.target.value }))} />
         </div>
       </Sheet>
+    </>
+  );
+
+  if (modal) {
+    return (
+      <div className="max-h-[85vh] overflow-y-auto p-4">
+        {body}
+        {overlays}
+      </div>
+    );
+  }
+
+  return (
+    <Screen maxWidth={900}>
+      {body}
+      {overlays}
     </Screen>
   );
 }

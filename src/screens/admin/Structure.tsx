@@ -56,8 +56,8 @@ export default function Structure() {
 
   const remove = (u: UnitView) =>
     confirmAction(
-      "Delete unit?",
-      `"${u.name}" — this can't be undone.`,
+      `Delete "${u.name}"?`,
+      "This can't be undone.",
       () => {
         try {
           deleteUnit(me.id, u.id);
