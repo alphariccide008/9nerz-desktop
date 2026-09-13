@@ -13,7 +13,7 @@ import { useDB } from "../lib/db/store";
 import { useSession } from "../lib/session";
 import { reportingChainView } from "../lib/services/org";
 import { listTasks } from "../lib/services/tasks";
-import { performanceOverview, fetchRealPerformance, RealPerformance } from "../lib/services/performance";
+import { performanceOverview, fetchRealPerformance, RealPerformance, tierForRank } from "../lib/services/performance";
 import { shortDate } from "../lib/util";
 import { colors } from "../lib/theme";
 import { TaskDetailContent } from "./tasks/TaskDetail";
@@ -335,7 +335,17 @@ function slipLabel(avgDaysLate: number | null): string {
   return `${avgDaysLate.toFixed(1)}d late`;
 }
 
-const MEDAL = ["🥇", "🥈", "🥉"] as const;
+/** Matches the web app's RankBadge exactly: a tier-coloured circle (green #1,
+ *  blue #2, amber #3, red beyond that, grey for no data), medal for the top 3. */
+function RankBadge({ rank }: { rank: number | null }) {
+  const tier = tierForRank(rank);
+  const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+  return (
+    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold" style={{ background: tier.soft, color: tier.text }}>
+      {medal ?? (rank ?? "—")}
+    </span>
+  );
+}
 
 /** Real-backend performance, matching the web app's dashboard-home.tsx layout:
  *  org-wide pie (admin), leaderboard or personal card, department + business-unit
@@ -372,15 +382,15 @@ function RealPerformanceSection({ perf, navigate }: { perf: RealPerformance | nu
             <dl className="grid grid-cols-3 gap-x-5 text-sm">
               <div>
                 <dt className="text-[11px] text-muted-foreground">Delivered</dt>
-                <dd className="font-semibold tabular-nums text-ink">{perf.org.delivered}</dd>
+                <dd className="font-semibold tabular-nums" style={{ color: "#202b4e" }}>{perf.org.delivered}</dd>
               </div>
               <div>
                 <dt className="text-[11px] text-muted-foreground">On time</dt>
-                <dd className="font-semibold tabular-nums text-teal">{perf.org.onTime}</dd>
+                <dd className="font-semibold tabular-nums" style={{ color: "#15803d" }}>{perf.org.onTime}</dd>
               </div>
               <div>
                 <dt className="text-[11px] text-muted-foreground">Overdue</dt>
-                <dd className="font-semibold tabular-nums text-destructive">{perf.org.openOverdue}</dd>
+                <dd className="font-semibold tabular-nums" style={{ color: "#b45309" }}>{perf.org.openOverdue}</dd>
               </div>
             </dl>
           </div>
@@ -413,11 +423,17 @@ function RealPerformanceSection({ perf, navigate }: { perf: RealPerformance | nu
           <div className="divide-y divide-hairline/60">
             {perf.people.slice(0, 8).map((p) => (
               <div key={p.id} className="flex flex-row items-center gap-3 px-4 py-2">
-                <span className="w-5 shrink-0 text-center text-[13px]">{p.rank && p.rank <= 3 ? MEDAL[p.rank - 1] : <span className="text-[11px] tabular-nums text-muted-foreground">{p.rank ?? "—"}</span>}</span>
+                <RankBadge rank={p.rank} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-ink">{p.name}</p>
                   <Text variant="caption">
-                    {p.onTime}/{p.delivered} on time{p.avgDaysLate != null ? ` · ${slipLabel(p.avgDaysLate)}` : ""}
+                    {p.onTime}/{p.delivered} on time
+                    {p.avgDaysLate != null ? (
+                      <>
+                        {" · "}
+                        <span style={{ color: Math.abs(p.avgDaysLate) < 0.1 ? undefined : p.avgDaysLate < 0 ? "#15803d" : "#b91c1c" }}>{slipLabel(p.avgDaysLate)}</span>
+                      </>
+                    ) : null}
                   </Text>
                 </div>
                 {p.role ? <span className="shrink-0 text-[11px] text-muted-foreground">{p.role}</span> : null}
@@ -465,7 +481,7 @@ function RealPerformanceSection({ perf, navigate }: { perf: RealPerformance | nu
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {perf.people.map((p) => (
               <Card key={p.id} className="flex flex-row items-center gap-3 p-3">
-                <Donut value={p.score} size={44} strokeWidth={5} />
+                <Donut value={p.score} size={44} strokeWidth={5} tone={tierForRank(p.rank).color} />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-ink">{p.name}</p>
                   <Text variant="caption">
@@ -510,7 +526,7 @@ function UnitGrid({ title, units }: { title: string; units: RealPerformance["byU
           .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
           .map((u) => (
             <Card key={u.id} className="flex flex-row items-center gap-3 p-3">
-              <Donut value={u.score} size={44} strokeWidth={5} />
+              <Donut value={u.score} size={44} strokeWidth={5} tone={tierForRank(u.rank).color} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-ink">{u.name}</p>
                 <Text variant="caption">{u.memberCount === 1 ? "1 person" : `${u.memberCount} people`}</Text>

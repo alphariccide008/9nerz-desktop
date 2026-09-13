@@ -53,6 +53,31 @@ export async function fetchRealPerformance(days = 90): Promise<RealPerformance> 
   return apiRequest<RealPerformance>("GET", `/api/org/performance?days=${days}`, undefined, getAccessToken());
 }
 
+/** Ported verbatim from the real web app's lib/perf.ts TIERS — rank-based colour,
+ *  not a flat tone: green for #1, blue for #2, amber for #3, red beyond that,
+ *  grey for no finished tasks yet. */
+export interface PerfTier {
+  key: string;
+  label: string;
+  color: string;
+  soft: string;
+  text: string;
+}
+export const TIERS: Record<string, PerfTier> = {
+  first: { key: "first", label: "Top performer", color: "#16a34a", soft: "rgba(22,163,74,0.12)", text: "#15803d" },
+  second: { key: "second", label: "2nd", color: "#2563eb", soft: "rgba(37,99,235,0.12)", text: "#1d4ed8" },
+  third: { key: "third", label: "3rd", color: "#f59e0b", soft: "rgba(245,158,11,0.15)", text: "#b45309" },
+  rest: { key: "rest", label: "Needs focus", color: "#dc2626", soft: "rgba(220,38,38,0.10)", text: "#b91c1c" },
+  none: { key: "none", label: "No data yet", color: "#94a3b8", soft: "rgba(148,163,184,0.14)", text: "#64748b" },
+};
+export function tierForRank(rank: number | null | undefined): PerfTier {
+  if (rank == null) return TIERS.none;
+  if (rank === 1) return TIERS.first;
+  if (rank === 2) return TIERS.second;
+  if (rank === 3) return TIERS.third;
+  return TIERS.rest;
+}
+
 const DONE_STATUSES: Task["status"][] = ["Completed", "Approved"];
 /** A user needs at least this many finished, due-dated tasks before they're eligible for "top performer". */
 const MIN_TASKS_FOR_AWARD = 3;
