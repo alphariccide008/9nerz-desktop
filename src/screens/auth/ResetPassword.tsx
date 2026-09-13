@@ -20,15 +20,13 @@ export default function ResetPassword() {
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const sendCode = () => {
+  const sendCode = async () => {
     setError(null);
     if (!email.trim()) return setError("Enter your email.");
-    const { devCode } = requestPasswordReset(email);
-    setDevCode(devCode || null);
+    await requestPasswordReset(email);
     setStep(2);
     toast.show("If that email exists, a code is on its way", "info");
   };
@@ -80,13 +78,6 @@ export default function ResetPassword() {
         </>
       ) : (
         <>
-          {devCode ? (
-            <Banner tone="info">
-              <Text variant="caption">
-                Dev mode — your reset code is <span className="font-bold text-ink">{devCode}</span>.
-              </Text>
-            </Banner>
-          ) : null}
           <Input
             label="Reset code"
             value={code}

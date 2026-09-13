@@ -2,18 +2,72 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useDB } from "./db/store";
-import { useSession } from "./session";
+import { useSession, RealUser, RealCompany } from "./session";
 import { Company, User } from "./db/schema";
 import { breakpoints, Breakpoint } from "./theme";
 
+/** A real account has no row in the local mock DB, so the rest of the app (which
+ *  still reads `User`/`Company` shapes everywhere) gets a synthetic record built
+ *  from the live profile. Fields the real API doesn't return (password, roleId,
+ *  timestamps, …) get harmless placeholders — nothing reads them for a real
+ *  account since the screens that do (Roles, People, …) are still local-mock-only
+ *  and haven't been swapped to the real API yet. */
+function realUserToLocalShape(u: RealUser): User {
+  const now = new Date().toISOString();
+  return {
+    id: u.id,
+    companyId: u.companyId,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    email: u.email,
+    password: "",
+    roleId: null,
+    reportsToUserId: null,
+    isCompanyAdmin: u.isCompanyAdmin,
+    status: "active",
+    isEmailVerified: true,
+    emailVerificationToken: null,
+    emailVerificationExpires: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    invitedBy: null,
+    inviteToken: null,
+    inviteExpires: null,
+    inviteAcceptedAt: null,
+    lastLoginAt: null,
+    lastActiveAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function realCompanyToLocalShape(c: RealCompany): Company {
+  const now = new Date().toISOString();
+  return {
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    status: (c.status as Company["status"]) ?? "active",
+    subscriptionTier: (c.subscriptionTier as Company["subscriptionTier"]) ?? "free",
+    billingReference: null,
+    ticketPrefix: "9TC",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 export function useCurrentUser(): User | null {
-  const { userId } = useSession();
-  return useDB((db) => db.users.find((u) => u.id === userId) ?? null);
+  const { userId, real } = useSession();
+  const mockUser = useDB((db) => db.users.find((u) => u.id === userId) ?? null);
+  return real ? realUserToLocalShape(real.user) : mockUser;
 }
 
 export function useCompany(): Company | null {
+  const { real } = useSession();
   const user = useCurrentUser();
-  return useDB((db) => (user ? db.companies.find((c) => c.id === user.companyId) ?? null : null));
+  const mockCompany = useDB((db) => (user ? db.companies.find((c) => c.id === user.companyId) ?? null : null));
+  if (real) return real.company ? realCompanyToLocalShape(real.company) : null;
+  return mockCompany;
 }
 
 export function useUnreadCount(): number {

@@ -38,8 +38,8 @@ export default function AppLayout() {
 
   useEffect(() => {
     if (!userId) return;
-    ping(userId);
-    const t = setInterval(() => ping(userId), 30_000);
+    ping();
+    const t = setInterval(() => ping(), 30_000);
     return () => clearInterval(t);
   }, [userId]);
 

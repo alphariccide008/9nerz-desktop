@@ -52,20 +52,20 @@ export default function Profile() {
 
   if (!me) return null;
 
-  const saveName = () => {
+  const saveName = async () => {
     try {
-      updateProfile(me.id, { firstName, lastName });
+      await updateProfile(me.id, { firstName, lastName });
       toast.show("Profile updated", "success");
     } catch (e) {
       toast.show(e instanceof Error ? e.message : "Failed", "error");
     }
   };
 
-  const savePassword = () => {
+  const savePassword = async () => {
     setPwError(null);
     if (next !== confirm) return setPwError("New passwords do not match.");
     try {
-      changePassword(me.id, cur, next);
+      await changePassword(me.id, cur, next);
       setCur("");
       setNext("");
       setConfirm("");

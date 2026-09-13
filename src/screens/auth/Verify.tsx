@@ -7,7 +7,7 @@ import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
 import { Banner } from "../../components/ui/Feedback";
-import { verifyEmail, resendVerification, peekCode } from "../../lib/services/auth";
+import { verifyEmail, resendVerification } from "../../lib/services/auth";
 import { useToast } from "../../components/ui/Toast";
 import { colors } from "../../lib/theme";
 
@@ -19,12 +19,7 @@ export default function Verify() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
-
-  useEffect(() => {
-    setDevCode(peekCode(email, "verification"));
-  }, [email]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -46,10 +41,9 @@ export default function Verify() {
     }
   };
 
-  const resend = () => {
+  const resend = async () => {
     try {
-      const { devCode } = resendVerification(email);
-      setDevCode(devCode);
+      await resendVerification(email);
       setCooldown(30);
       toast.show("New code sent", "success");
     } catch (e) {
@@ -65,13 +59,6 @@ export default function Verify() {
       onBack={() => navigate("/welcome")}
     >
       {error ? <Banner tone="error">{error}</Banner> : null}
-      {devCode ? (
-        <Banner tone="info">
-          <Text variant="caption">
-            Dev mode — no email sender configured. Your code is <span className="font-bold text-ink">{devCode}</span>.
-          </Text>
-        </Banner>
-      ) : null}
       <Input
         label="Verification code"
         value={code}

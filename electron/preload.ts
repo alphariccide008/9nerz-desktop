@@ -10,4 +10,8 @@ contextBridge.exposeInMainWorld("nerz", {
   openExternal: (url: string) => ipcRenderer.invoke("nerz:openExternal", url),
   appVersion: () => ipcRenderer.invoke("nerz:appVersion"),
   setBadge: (dataUrl: string | null, description?: string) => ipcRenderer.invoke("nerz:setBadge", dataUrl, description),
+  api: {
+    request: (method: string, path: string, body?: unknown, token?: string | null) =>
+      ipcRenderer.invoke("nerz:api", { method, path, body, token }),
+  },
 });

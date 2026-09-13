@@ -9,16 +9,6 @@ import { Text } from "../../components/ui/Text";
 import { Banner } from "../../components/ui/Feedback";
 import { login } from "../../lib/services/auth";
 import { colors } from "../../lib/theme";
-import { cn } from "../../lib/cn";
-
-const DEMO_PASSWORD = "Password1!";
-const DEMO_ACCOUNTS = [
-  { label: "Admin", email: "ada@acme.test" },
-  { label: "Head of Business", email: "bode@acme.test" },
-  { label: "Manager", email: "chidi@acme.test" },
-  { label: "Senior Associate", email: "dara@acme.test" },
-  { label: "Associate", email: "hauwa@acme.test" },
-];
 
 export default function Login() {
   const navigate = useNavigate();
@@ -26,12 +16,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const useDemo = (demoEmail: string) => {
-    setError(null);
-    setEmail(demoEmail);
-    setPassword(DEMO_PASSWORD);
-  };
 
   const submit = async () => {
     setError(null);
@@ -89,32 +73,6 @@ export default function Login() {
         onKeyDown={(e) => e.key === "Enter" && submit()}
       />
       <Button title="Sign in" onPress={submit} loading={busy} fullWidth />
-
-      <div className="flex flex-col gap-2 rounded-xl border border-hairline bg-muted/40 p-3">
-        <Text variant="label" className="uppercase tracking-[1px]">
-          Try a demo account
-        </Text>
-        <div className="flex flex-row flex-wrap gap-2">
-          {DEMO_ACCOUNTS.map((d) => {
-            const active = email === d.email;
-            return (
-              <button
-                key={d.email}
-                type="button"
-                onClick={() => useDemo(d.email)}
-                className={cn("rounded-full border px-3 py-1.5", active ? "border-teal bg-teal/10" : "border-hairline bg-card")}
-              >
-                <Text variant="caption" tone={active ? "teal" : "default"}>
-                  {d.label}
-                </Text>
-              </button>
-            );
-          })}
-        </div>
-        <Text variant="caption" className="text-muted-foreground">
-          Fills the form — every demo account uses the password <span className="font-semibold">{DEMO_PASSWORD}</span>.
-        </Text>
-      </div>
     </AuthScaffold>
   );
 }

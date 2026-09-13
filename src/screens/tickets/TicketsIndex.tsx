@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, Inbox, Mail, MailPlus, Search, X } from "lucide-react";
 
@@ -12,6 +12,7 @@ import { escalateOverdueTickets, listTickets, TicketListItem } from "../../lib/s
 import { listMembers, listUnits } from "../../lib/services/org";
 import { colors } from "../../lib/theme";
 import { cn } from "../../lib/cn";
+import { TicketDetailContent } from "./TicketDetail";
 
 const TABS = [
   ["all", "All"],
@@ -36,7 +37,6 @@ const STATUS_RANK: Record<string, number> = { open: 0, reopened: 1, in_progress:
 type SortKey = "number" | "subject" | "created" | "priority" | "status";
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
-const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
 export default function TicketsIndex() {
   const me = useCurrentUser();
@@ -55,6 +55,16 @@ export default function TicketsIndex() {
   const [fAssignee, setFAssignee] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "number", dir: "desc" });
   const [page, setPage] = useState(1);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openId]);
 
   const toggleSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "subject" ? "asc" : "desc" }));
   const clearFilters = () => {
@@ -115,7 +125,8 @@ export default function TicketsIndex() {
   const selectCls = "rounded-lg border border-hairline bg-card px-2 py-1.5 text-xs text-ink outline-none focus:border-ink";
 
   return (
-    <Screen contentClassName="gap-3 px-5 py-5">
+    <>
+    <Screen contentClassName="gap-3 px-2 py-5">
       <div className="flex flex-row items-center justify-between">
         <h1 className="flex flex-row items-center gap-2 font-display text-lg font-bold text-ink">
           <Inbox size={18} /> Tickets
@@ -187,46 +198,41 @@ export default function TicketsIndex() {
         {rows.length === 0 ? (
           <EmptyState icon={<Mail size={22} color={colors.slate} />} title={tickets.length === 0 ? "No tickets in this view" : "No tickets match these filters"} />
         ) : (
-          <table className="w-full table-fixed border-collapse text-[12.5px]">
+          <table className="w-full border-collapse text-[12px]">
             <thead>
               <tr className="border-b border-hairline text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <Th label="Key" sortKey="number" sort={sort} onSort={toggleSort} className="w-14" />
-                <Th label="Summary" sortKey="subject" sort={sort} onSort={toggleSort} />
-                <Th label="Created" sortKey="created" sort={sort} onSort={toggleSort} className="w-20" />
-                <th className="px-2 py-1.5 w-20 truncate">Requester</th>
-                <th className="px-2 py-1.5 w-16 truncate">Queue</th>
-                <Th label="Priority" sortKey="priority" sort={sort} onSort={toggleSort} className="w-16" />
-                <th className="px-2 py-1.5 w-20 truncate">Assignee</th>
-                <Th label="Status" sortKey="status" sort={sort} onSort={toggleSort} className="w-20" />
-                <th className="px-2 py-1.5 w-14 truncate">Resolution</th>
+                <Th label="Key" sortKey="number" sort={sort} onSort={toggleSort} />
+                <Th label="Summary" sortKey="subject" sort={sort} onSort={toggleSort} className="w-full" />
+                <Th label="Created" sortKey="created" sort={sort} onSort={toggleSort} />
+                <th className="whitespace-nowrap px-1 py-1.5">Requester</th>
+                <th className="whitespace-nowrap px-1 py-1.5">Queue</th>
+                <Th label="Priority" sortKey="priority" sort={sort} onSort={toggleSort} />
+                <th className="whitespace-nowrap px-1 py-1.5">Assignee</th>
+                <Th label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
               </tr>
             </thead>
             <tbody>
               {pageRows.map((t: TicketListItem) => (
-                <tr key={t.id} onClick={() => navigate(`/tickets/${t.id}`)} className="cursor-pointer border-b border-hairline/70 last:border-0 hover:bg-background">
-                  <td className="truncate px-2 py-2 font-mono text-[11px] font-semibold text-ink">{t.ref ?? "—"}</td>
-                  <td className="px-2 py-2">
-                    <span className="block truncate font-medium text-ink">{t.subject}</span>
+                <tr key={t.id} onClick={() => setOpenId(t.id)} className="cursor-pointer border-b border-hairline/70 last:border-0 hover:bg-background">
+                  <td className="whitespace-nowrap px-1 py-1.5 font-mono text-[11px] font-semibold text-ink">{t.ref ?? "—"}</td>
+                  <td className="px-1 py-1.5">
+                    <span className="block max-w-[20rem] truncate font-medium text-ink">{t.subject}</span>
                   </td>
-                  <td className="truncate px-2 py-2 text-muted-foreground">
-                    <span className="text-ink">{fmtDate(t.createdAt)}</span>
-                    <span className="ml-1 text-[10px]">{fmtTime(t.createdAt)}</span>
+                  <td className="whitespace-nowrap px-1 py-1.5 text-muted-foreground">{fmtDate(t.createdAt)}</td>
+                  <td className="px-1 py-1.5 text-muted-foreground">
+                    <span className="block max-w-[9rem] truncate">{t.requesterName || t.requesterEmail}</span>
                   </td>
-                  <td className="px-2 py-2 text-muted-foreground">
-                    <span className="block truncate">{t.requesterName || t.requesterEmail}</span>
-                  </td>
-                  <td className="truncate px-2 py-2 text-muted-foreground">{t.orgUnit?.name || <span className="text-muted-foreground/60">Unrouted</span>}</td>
-                  <td className="truncate px-2 py-2">
+                  <td className="whitespace-nowrap px-1 py-1.5 text-muted-foreground">{t.orgUnit?.name || <span className="text-muted-foreground/60">Unrouted</span>}</td>
+                  <td className="whitespace-nowrap px-1 py-1.5">
                     <span className="inline-flex items-center gap-1 text-muted-foreground">
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: PRIORITY_DOT[t.priority] ?? colors.hairline }} />
-                      <span className="truncate">{t.priority}</span>
+                      {t.priority}
                     </span>
                   </td>
-                  <td className="truncate px-2 py-2">{t.assignee ? `${t.assignee.firstName} ${t.assignee.lastName}` : <span className="text-muted-foreground/60">Unassigned</span>}</td>
-                  <td className="truncate px-2 py-2">
+                  <td className="whitespace-nowrap px-1 py-1.5">{t.assignee ? `${t.assignee.firstName} ${t.assignee.lastName}` : <span className="text-muted-foreground/60">Unassigned</span>}</td>
+                  <td className="whitespace-nowrap px-1 py-1.5">
                     <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold", STATUS_STYLE[t.status] || "bg-muted text-slate")}>{STATUS_LABEL[t.status] || t.status}</span>
                   </td>
-                  <td className="truncate px-2 py-2 text-muted-foreground">{t.status === "resolved" ? "Resolved" : <span className="text-muted-foreground/60">Unresolved</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -253,13 +259,23 @@ export default function TicketsIndex() {
         </div>
       ) : null}
     </Screen>
+
+    {openId ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(18,23,42,0.45)" }}>
+        <div className="absolute inset-0" onClick={() => setOpenId(null)} />
+        <div className="relative w-[96vw] max-w-[1152px] overflow-hidden rounded-2xl border border-hairline bg-card shadow-xl">
+          <TicketDetailContent ticketId={openId} onClose={() => setOpenId(null)} />
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
 
 function Th({ label, sortKey, sort, onSort, className = "" }: { label: string; sortKey: SortKey; sort: { key: SortKey; dir: "asc" | "desc" }; onSort: (k: SortKey) => void; className?: string }) {
   const active = sort.key === sortKey;
   return (
-    <th className={cn("px-2 py-1.5 truncate", className)}>
+    <th className={cn("px-1 py-1.5 truncate", className)}>
       <button type="button" onClick={() => onSort(sortKey)} className={cn("inline-flex items-center gap-1 truncate uppercase tracking-wide transition hover:text-ink", active && "text-ink")}>
         {label}
         {active ? sort.dir === "asc" ? <ArrowUp size={11} /> : <ArrowDown size={11} /> : <ChevronDown size={11} className="opacity-40" />}

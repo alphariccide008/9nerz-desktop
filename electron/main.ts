@@ -5,6 +5,8 @@ import fs from "node:fs";
 
 const isDev = !app.isPackaged;
 const DATA_FILE = path.join(app.getPath("userData"), "nerz-store.json");
+const API_BASE = "https://www.9nerz.com";
+const PENDING_SIGNUP_COOKIE = "nerz_pending_signup";
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -65,6 +67,56 @@ ipcMain.handle("nerz:notify", (_e, title: string, body: string) => {
 
 ipcMain.handle("nerz:openExternal", (_e, url: string) => shell.openExternal(url));
 ipcMain.handle("nerz:appVersion", () => app.getVersion());
+
+// ── Real backend proxy (https://www.9nerz.com/api/*) ─────────────────────────
+// Runs in the main process (Node), not the renderer, because the renderer loads
+// over file:// in production and a browser fetch() from that origin can't clear
+// the API's CORS preflight for authenticated (Bearer-header) requests — Node's
+// fetch has no such restriction. The signup flow's short-lived pending-signup
+// cookie is captured here and replayed on the matching verify/resend call since
+// there is no browser cookie jar to do it automatically.
+let pendingSignupCookie: string | null = null;
+
+type ApiRequest = { method: string; path: string; body?: unknown; token?: string | null };
+type ApiResult = { ok: boolean; status: number; data: unknown };
+
+ipcMain.handle("nerz:api", async (_e, req: ApiRequest): Promise<ApiResult> => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (req.token) headers.Authorization = `Bearer ${req.token}`;
+  if (pendingSignupCookie) headers.Cookie = pendingSignupCookie;
+
+  try {
+    const res = await fetch(`${API_BASE}${req.path}`, {
+      method: req.method,
+      headers,
+      body: req.body !== undefined && req.body !== null ? JSON.stringify(req.body) : undefined,
+    });
+
+    const rawCookies =
+      typeof (res.headers as { getSetCookie?: () => string[] }).getSetCookie === "function"
+        ? (res.headers as { getSetCookie: () => string[] }).getSetCookie()
+        : res.headers.get("set-cookie")
+          ? [res.headers.get("set-cookie") as string]
+          : [];
+    for (const c of rawCookies) {
+      const pair = c.split(";")[0];
+      if (!pair?.startsWith(`${PENDING_SIGNUP_COOKIE}=`)) continue;
+      const value = pair.slice(PENDING_SIGNUP_COOKIE.length + 1);
+      pendingSignupCookie = value ? pair : null;
+    }
+
+    let data: unknown = null;
+    try {
+      data = await res.json();
+    } catch {
+      // empty body (e.g. 204) — leave data null
+    }
+    return { ok: res.ok, status: res.status, data };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Network request failed";
+    return { ok: false, status: 0, data: { success: false, message } };
+  }
+});
 
 ipcMain.handle("nerz:setBadge", (_e, dataUrl: string | null, description?: string) => {
   if (!mainWindow) return;
@@ -145,7 +197,17 @@ if (gotSingleInstanceLock) {
   app.whenReady().then(() => {
     createWindow();
     createTray();
-    if (!isDev) autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+    if (!isDev) {
+      // The main window hides-to-tray on close instead of quitting (see createWindow),
+      // so electron-updater's normal "install on quit" never fires and a downloaded
+      // update sits there forever. Force the install explicitly once the download
+      // completes instead of relying on app quit.
+      autoUpdater.on("update-downloaded", () => {
+        isQuitting = true;
+        autoUpdater.quitAndInstall();
+      });
+      autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+    }
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

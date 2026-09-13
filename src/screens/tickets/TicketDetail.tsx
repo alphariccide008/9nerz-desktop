@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { FileText, Mail, Paperclip, Send, StickyNote, X } from "lucide-react";
+import { ArrowLeft, FileText, Mail, Paperclip, Send, StickyNote, X } from "lucide-react";
 
 import { Screen } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
@@ -42,6 +42,19 @@ function fileToAttachment(file: File): Promise<NewAttachment> {
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return (
+    <Screen maxWidth={900}>
+      <TicketDetailContent ticketId={id} />
+    </Screen>
+  );
+}
+
+/** Ticket header + thread + composer. Used full-page (the /tickets/:id route, no
+ *  `onClose`) and as the content of the in-list popup (TicketsIndex, with
+ *  `onClose`) — mirrors the real web app's dual-mode ticket-detail component. */
+export function TicketDetailContent({ ticketId: id, onClose }: { ticketId: string; onClose?: () => void }) {
+  const modal = typeof onClose === "function";
   const me = useCurrentUser();
   const toast = useToast();
   const [draft, setDraft] = useState("");
@@ -62,11 +75,7 @@ export default function TicketDetail() {
   }, [me, id, tick]);
 
   if (!me || !id) return null;
-  if (!view) return (
-    <Screen>
-      <Loading />
-    </Screen>
-  );
+  if (!view) return <Loading />;
 
   const { ticket, messages, canManage, canRespond, isAdmin, unitMembers } = view;
 
@@ -103,12 +112,21 @@ export default function TicketDetail() {
     }
   };
 
-  return (
-    <Screen maxWidth={900}>
+  const attachmentInputs = (
+    <>
       <input ref={imageInput} type="file" accept="image/*" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
       <input ref={pdfInput} type="file" accept="application/pdf" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
+    </>
+  );
 
-      <div>
+  const header = (
+    <>
+      {modal ? (
+        <button type="button" onClick={onClose} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-ink">
+          <ArrowLeft size={14} /> Close
+        </button>
+      ) : null}
+      <div className={modal ? "pr-8" : ""}>
         <div className="flex flex-row flex-wrap items-center gap-2">
           {ticket.ref ? <span className="rounded bg-ink/[0.06] px-1.5 py-0.5 font-mono text-[11px] font-semibold text-ink">{ticket.ref}</span> : null}
           <h1 className="min-w-0 break-words font-display text-lg font-bold text-ink">{ticket.subject}</h1>
@@ -120,9 +138,12 @@ export default function TicketDetail() {
           {ticket.sourceInbox ? ` · via ${ticket.sourceInbox}` : ""} · opened {new Date(ticket.createdAt).toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
         </Text>
       </div>
+    </>
+  );
 
-      {canManage || (NEXT[ticket.status] && canRespond) ? (
-        <Card className="flex flex-row flex-wrap items-center gap-3 p-3">
+  const controls =
+    canManage || (NEXT[ticket.status] && canRespond) ? (
+      <Card className="flex flex-row flex-wrap items-center gap-3 p-3">
           {isAdmin ? (
             <label className="flex flex-row items-center gap-1.5 text-[11px] text-muted-foreground">
               Department
@@ -169,10 +190,16 @@ export default function TicketDetail() {
             </div>
           ) : null}
         </Card>
-      ) : null}
+      ) : null;
 
-      <div className="flex flex-col gap-2.5">
-        {messages.map((m) => (
+  const thread = (
+    <div className="flex flex-col gap-2.5">
+      {messages.length === 0 ? (
+        <Text variant="caption" className="block py-8 text-center">
+          No messages yet.
+        </Text>
+      ) : (
+        messages.map((m) => (
           <div
             key={m.id}
             className="rounded-xl border p-3"
@@ -191,12 +218,14 @@ export default function TicketDetail() {
             {m.body && m.body !== "(see attachment)" ? <Linkified text={m.body} /> : null}
             <MessageAttachments items={m.attachments} />
           </div>
-        ))}
-      </div>
+        ))
+      )}
+    </div>
+  );
 
-      {!canRespond ? (
-        <Banner tone="info">{ticket.assigneeId ? "Assigned to someone else — only they or the department manager can respond." : "Waiting to be assigned by the department manager."}</Banner>
-      ) : (
+  const composer = !canRespond ? (
+    <Banner tone="info">{ticket.assigneeId ? "Assigned to someone else — only they or the department manager can respond." : "Waiting to be assigned by the department manager."}</Banner>
+  ) : (
         <Card className="flex flex-col gap-2 p-3">
           <div className="flex flex-row gap-1">
             <button type="button" onClick={() => setInternal(false)} className={`rounded px-2 py-1 ${!internal ? "bg-ink" : ""}`}>
@@ -229,8 +258,32 @@ export default function TicketDetail() {
             <Button title={internal ? "Add note" : "Send reply"} size="sm" className="ml-auto" icon={<Send size={14} color={colors.white} />} onPress={send} />
           </div>
         </Card>
-      )}
-    </Screen>
+      );
+
+  if (modal) {
+    return (
+      <div className="flex max-h-[85vh] flex-col">
+        {attachmentInputs}
+        <div className="shrink-0 space-y-3 border-b border-hairline p-4">{header}</div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background p-4">
+          {controls}
+          {thread}
+        </div>
+        <div className="shrink-0 border-t border-hairline bg-card p-4">{composer}</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {attachmentInputs}
+      <div className="flex flex-col gap-4">
+        {header}
+        {controls}
+        {thread}
+        {composer}
+      </div>
+    </>
   );
 }
 

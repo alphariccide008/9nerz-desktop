@@ -7,11 +7,12 @@ import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Text";
 import { Banner } from "../../components/ui/Feedback";
-import { inviteByToken, acceptInvite } from "../../lib/services/auth";
+import { previewInvite, startInviteAccept, confirmInviteAccept } from "../../lib/services/auth";
 import { validatePassword } from "../../lib/util";
 import { useToast } from "../../components/ui/Toast";
-import { getDB } from "../../lib/db/store";
 import { colors } from "../../lib/theme";
+
+type Preview = Awaited<ReturnType<typeof previewInvite>>;
 
 export default function AcceptInvite() {
   const [params] = useSearchParams();
@@ -19,44 +20,75 @@ export default function AcceptInvite() {
   const navigate = useNavigate();
   const toast = useToast();
   const [token, setToken] = useState(tokenParam);
+  const [preview, setPreview] = useState<Preview>(null);
+  const [checked, setChecked] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const found = token ? inviteByToken(token) : null;
 
   useEffect(() => {
-    if (found?.user) {
-      setFirstName(found.user.firstName === "Invited" ? "" : found.user.firstName);
-      setLastName(found.user.lastName === "User" ? "" : found.user.lastName);
+    setChecked(false);
+    if (!token) {
+      setPreview(null);
+      setChecked(true);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    previewInvite(token).then((p) => {
+      if (cancelled) return;
+      setPreview(p);
+      setChecked(true);
+      if (p) {
+        setFirstName(p.firstName || "");
+        setLastName(p.lastName || "");
+        if (p.passwordSet) setStep(2);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
-  const submit = async () => {
+  const submitStep1 = async () => {
     setError(null);
     const pw = validatePassword(password);
     if (!pw.valid) return setError(pw.message);
     setBusy(true);
     try {
-      await acceptInvite({ token, firstName, lastName, password });
-      toast.show("Welcome aboard", "success");
-      navigate("/dashboard", { replace: true });
+      await startInviteAccept({ token, firstName, lastName, password });
+      toast.show("Code sent to your email", "success");
+      setStep(2);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not accept the invitation.");
+      setError(e instanceof Error ? e.message : "Could not start accepting the invitation.");
     } finally {
       setBusy(false);
     }
   };
 
-  const pendingTokens = getDB().devInvites;
+  const submitStep2 = async () => {
+    setError(null);
+    if (otp.trim().length !== 6) return setError("Enter the 6-digit code.");
+    setBusy(true);
+    try {
+      await confirmInviteAccept({ token, otp });
+      toast.show("Welcome aboard", "success");
+      navigate("/dashboard", { replace: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not confirm the invitation.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <AuthScaffold
       eyebrow="Join"
-      title={found?.company ? `Join ${found.company.name}` : "Accept your invitation"}
-      subtitle="Set a password to activate your account and land in the workspace."
+      title={preview?.company ? `Join ${preview.company}` : "Accept your invitation"}
+      subtitle={step === 1 ? "Set a password to activate your account." : "Enter the code we emailed you to finish joining."}
       onBack={() => navigate("/welcome")}
     >
       {error ? <Banner tone="error">{error}</Banner> : null}
@@ -64,12 +96,12 @@ export default function AcceptInvite() {
         <Input label="Invitation token" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Paste the token from your invite" />
       ) : null}
 
-      {!found && token ? <Banner tone="warn">That invitation is invalid or already used.</Banner> : null}
+      {checked && !preview && token ? <Banner tone="warn">That invitation is invalid or already used.</Banner> : null}
 
-      {found ? (
+      {preview && step === 1 ? (
         <>
           <Banner tone="info">
-            <Text variant="caption">Invited as {found.user.email}</Text>
+            <Text variant="caption">Invited as {preview.email}</Text>
           </Banner>
           <div className="flex flex-row gap-3">
             <Input containerClassName="flex-1" label="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jane" />
@@ -81,16 +113,27 @@ export default function AcceptInvite() {
             onChange={(e) => setPassword(e.target.value)}
             secure
             icon={<Lock size={16} color={colors.mutedForeground} />}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
+            onKeyDown={(e) => e.key === "Enter" && submitStep1()}
           />
-          <Button title="Join workspace" onPress={submit} loading={busy} fullWidth />
+          <Button title="Continue" onPress={submitStep1} loading={busy} fullWidth />
         </>
       ) : null}
 
-      {!tokenParam && pendingTokens.length > 0 ? (
-        <Banner tone="info">
-          <Text variant="caption">Dev mode — pending invite tokens: {pendingTokens.map((i) => `${i.email} → ${i.token}`).join(", ")}</Text>
-        </Banner>
+      {preview && step === 2 ? (
+        <>
+          <Banner tone="info">
+            <Text variant="caption">We emailed a 6-digit code to {preview.email}.</Text>
+          </Banner>
+          <Input
+            label="Verification code"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+            placeholder="123456"
+            className="text-center text-[20px] tracking-[8px]"
+            onKeyDown={(e) => e.key === "Enter" && submitStep2()}
+          />
+          <Button title="Join workspace" onPress={submitStep2} loading={busy} fullWidth disabled={otp.length !== 6} />
+        </>
       ) : null}
     </AuthScaffold>
   );

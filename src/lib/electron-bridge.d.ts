@@ -12,6 +12,14 @@ declare global {
       openExternal(url: string): Promise<void>;
       appVersion(): Promise<string>;
       setBadge(dataUrl: string | null, description?: string): Promise<void>;
+      api: {
+        request(
+          method: string,
+          path: string,
+          body?: unknown,
+          token?: string | null,
+        ): Promise<{ ok: boolean; status: number; data: unknown }>;
+      };
     };
   }
 }

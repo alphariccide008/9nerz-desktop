@@ -1,49 +1,31 @@
 /**
- * Auth service — local mirror of app/api/auth/* and the signup→company-creation
- * flow. Verification / reset codes are surfaced on-screen (db.devCodes) exactly
- * like the web app prints them to the server console when no email sender is set.
+ * Auth service — calls the real, live backend at https://www.9nerz.com/api/auth/*
+ * and app/api/org/invites/* (see lib/api/http.ts for the transport). This is the
+ * first service migrated off the local mock database (lib/db/store.ts) per the
+ * "swap seam" the app was built around — org/tasks/tickets/etc. are still local
+ * mock data for now and will move over in later passes.
  */
 
-import { getDB, mutate } from "../db/store";
-import { User } from "../db/schema";
+import { apiRequest, ApiError } from "../api/http";
+import { ServiceError } from "./helpers";
 import {
-  uid,
-  nowISO,
-  sixDigitCode,
-  validatePassword,
-  isConsumerEmail,
-  slugify,
-} from "../util";
-import { setUserSession, clearUserSession, getSession } from "../session";
-import { ServiceError, writeAudit, notify } from "./helpers";
+  setRealSession,
+  clearUserSession,
+  getSession,
+  getAccessToken,
+  updateRealTokens,
+  RealSession,
+} from "../session";
 
-const CODE_TTL_MS = 15 * 60 * 1000;
+type LoginResponse = { user: RealSession["user"]; accessToken: string; refreshToken: string };
+type VerifyResponse = { user: RealSession["user"]; company: RealSession["company"]; accessToken: string; refreshToken: string };
 
-function findUserByEmail(email: string): User | undefined {
-  const e = email.trim().toLowerCase();
-  return getDB().users.find((u) => u.email.toLowerCase() === e);
+function rethrow(e: unknown, fallback: string): never {
+  if (e instanceof ApiError) throw new ServiceError(e.message || fallback, e.code ?? "error");
+  throw new ServiceError(fallback);
 }
 
-function pushCode(email: string, kind: "verification" | "password_reset"): string {
-  const code = sixDigitCode();
-  mutate((d) => {
-    d.devCodes = [
-      ...d.devCodes.filter((c) => !(c.email === email && c.kind === kind)),
-      { email, code, kind, expiresAt: new Date(Date.now() + CODE_TTL_MS).toISOString() },
-    ];
-  });
-  return code;
-}
-
-/** In dev we surface the code on-screen; screens read this to show the hint. */
-export function peekCode(email: string, kind: "verification" | "password_reset"): string | null {
-  const c = getDB().devCodes.find((x) => x.email === email && x.kind === kind);
-  if (!c) return null;
-  if (new Date(c.expiresAt).getTime() < Date.now()) return null;
-  return c.code;
-}
-
-// ── Signup → company provisioning ───────────────────────────────────────────
+// ── Signup → verify (company provisioning happens server-side on verify) ────
 
 export async function signup(input: {
   organizationName: string;
@@ -51,272 +33,157 @@ export async function signup(input: {
   lastName: string;
   email: string;
   password: string;
-}): Promise<{ email: string; devCode: string }> {
+}): Promise<{ email: string }> {
   const email = input.email.trim().toLowerCase();
-  if (!input.organizationName.trim() || !input.firstName.trim() || !input.lastName.trim() || !email || !input.password)
-    throw new ServiceError("Please fill out all fields.");
-  if (isConsumerEmail(email))
-    throw new ServiceError("Use a company email — consumer providers like Gmail or Yahoo aren't allowed.");
-  const pw = validatePassword(input.password);
-  if (!pw.valid) throw new ServiceError(pw.message);
-  if (findUserByEmail(email)) throw new ServiceError("An account with that email already exists.");
-
-  const companyId = uid("co");
-  const roleId = uid("role");
-  const policyId = uid("pol");
-  const userId = uid("usr");
-  const ts = nowISO();
-  let slug = slugify(input.organizationName);
-  const taken = new Set(getDB().companies.map((c) => c.slug));
-  if (taken.has(slug)) slug = `${slug}-${Math.random().toString(36).slice(2, 5)}`;
-
-  mutate((d) => {
-    d.companies = [
-      ...d.companies,
-      {
-        id: companyId,
-        name: input.organizationName.trim(),
-        slug,
-        status: "active",
-        subscriptionTier: "free",
-        billingReference: null,
-        ticketPrefix: "9TC",
-        createdAt: ts,
-        updatedAt: ts,
-      },
-    ];
-    d.roles = [
-      ...d.roles,
-      { id: roleId, companyId, name: "Company Admin", rank: 1, reportsToRoleId: null, isAdminRole: true, createdAt: ts, updatedAt: ts },
-    ];
-    d.permissionPolicies = [
-      ...d.permissionPolicies,
-      {
-        id: policyId,
-        companyId,
-        inviteScope: "own_unit_and_subunits",
-        inviteRankCeiling: "below_own",
-        reportingChangeScope: "own_unit",
-        approvalRequiredFor: ["cross_unit_move"],
-        slaHours: null,
-        createdAt: ts,
-        updatedAt: ts,
-      },
-    ];
-    d.users = [
-      ...d.users,
-      {
-        id: userId,
-        companyId,
-        firstName: input.firstName.trim(),
-        lastName: input.lastName.trim(),
-        email,
-        password: input.password,
-        roleId,
-        reportsToUserId: null,
-        isCompanyAdmin: true,
-        status: "active",
-        isEmailVerified: false,
-        emailVerificationToken: null,
-        emailVerificationExpires: new Date(Date.now() + CODE_TTL_MS).toISOString(),
-        passwordResetToken: null,
-        passwordResetExpires: null,
-        invitedBy: null,
-        inviteToken: null,
-        inviteExpires: null,
-        inviteAcceptedAt: null,
-        lastLoginAt: null,
-        lastActiveAt: null,
-        createdAt: ts,
-        updatedAt: ts,
-      },
-    ];
-    d.subscriptions = [
-      ...d.subscriptions,
-      { id: uid("sub"), companyId, tier: "free", planId: "free", status: "active", provider: null, trialEndsAt: null, isFoundingSub: false, currentPeriodEnd: null, graceEndsAt: null, createdAt: ts, updatedAt: ts },
-    ];
-    d.ticketInboxes = [
-      ...d.ticketInboxes,
-      { id: uid("inbox"), companyId, address: `support@${slug}.9nerz.app`, label: "General support", isDefault: true, createdAt: ts },
-    ];
-    writeAudit(d, { companyId, actorId: userId, actionType: "company_created", entityType: "company", entityId: companyId });
-    writeAudit(d, { companyId, actorId: userId, actionType: "signup", entityType: "user", entityId: userId });
-  });
-
-  const devCode = pushCode(email, "verification");
-  return { email, devCode };
+  try {
+    await apiRequest("POST", "/api/auth/signup", {
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
+      email,
+      password: input.password,
+      companyName: input.organizationName.trim(),
+    });
+    return { email };
+  } catch (e) {
+    rethrow(e, "Signup failed. Please try again.");
+  }
 }
 
 export async function verifyEmail(email: string, code: string): Promise<{ userId: string }> {
-  const e = email.trim().toLowerCase();
-  const rec = getDB().devCodes.find((c) => c.email === e && c.kind === "verification");
-  if (!rec || new Date(rec.expiresAt).getTime() < Date.now())
-    throw new ServiceError("That code has expired. Request a new one.");
-  if (rec.code !== code.trim()) throw new ServiceError("Incorrect code.");
-  const user = findUserByEmail(e);
-  if (!user) throw new ServiceError("Account not found.");
-
-  mutate((d) => {
-    d.users = d.users.map((u) =>
-      u.id === user.id ? { ...u, isEmailVerified: true, status: "active", updatedAt: nowISO() } : u,
-    );
-    d.devCodes = d.devCodes.filter((c) => !(c.email === e && c.kind === "verification"));
-    writeAudit(d, { companyId: user.companyId, actorId: user.id, actionType: "email_verified", entityType: "user", entityId: user.id });
-  });
-  await setUserSession(user.id);
-  return { userId: user.id };
+  try {
+    const data = await apiRequest<VerifyResponse>("POST", "/api/auth/verify-email", {
+      email: email.trim().toLowerCase(),
+      otp: code.trim(),
+    });
+    await setRealSession({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user, company: data.company });
+    return { userId: data.user.id };
+  } catch (e) {
+    rethrow(e, "Verification failed.");
+  }
 }
 
-export function resendVerification(email: string): { devCode: string } {
-  const e = email.trim().toLowerCase();
-  if (!findUserByEmail(e)) throw new ServiceError("Account not found.");
-  return { devCode: pushCode(e, "verification") };
+export async function resendVerification(email: string): Promise<void> {
+  try {
+    await apiRequest("POST", "/api/auth/resend-otp", { email: email.trim().toLowerCase() });
+  } catch (e) {
+    rethrow(e, "Could not resend the code.");
+  }
+}
+
+/** Dev-mode code hint — the real backend emails codes, never surfaces them on screen. */
+export function peekCode(_email: string, _kind: "verification" | "password_reset"): string | null {
+  return null;
 }
 
 // ── Login ──────────────────────────────────────────────────────────────────
 
 export async function login(email: string, password: string): Promise<{ userId: string; needsVerification: boolean }> {
-  const user = findUserByEmail(email);
-  if (!user || user.password !== password) throw new ServiceError("Incorrect email or password.");
-  const company = getDB().companies.find((c) => c.id === user.companyId);
-  if (company?.status === "frozen") throw new ServiceError("This workspace is frozen. Contact your administrator.");
-  if (company?.status === "suspended") throw new ServiceError("This workspace is suspended.");
-  if (user.status === "inactive") throw new ServiceError("Your account has been deactivated.");
-  if (user.status === "invited") throw new ServiceError("Accept your invitation first — check the link you were sent.");
-
-  if (!user.isEmailVerified) {
-    pushCode(user.email, "verification");
-    return { userId: user.id, needsVerification: true };
+  try {
+    const data = await apiRequest<LoginResponse>("POST", "/api/auth/login", { email: email.trim().toLowerCase(), password });
+    await setRealSession({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user, company: null });
+    return { userId: data.user.id, needsVerification: false };
+  } catch (e) {
+    if (e instanceof ApiError && /not verified/i.test(e.message)) {
+      return { userId: "", needsVerification: true };
+    }
+    rethrow(e, "Login failed. Please try again.");
   }
-
-  mutate((d) => {
-    d.users = d.users.map((u) =>
-      u.id === user.id ? { ...u, lastLoginAt: nowISO(), lastActiveAt: nowISO() } : u,
-    );
-    writeAudit(d, { companyId: user.companyId, actorId: user.id, actionType: "login", entityType: "user", entityId: user.id });
-  });
-  await setUserSession(user.id);
-  return { userId: user.id, needsVerification: false };
 }
 
 export async function logout(): Promise<void> {
-  const u = getDB().users.find((x) => x.id === getSession().userId);
-  if (u) {
-    mutate((d) => writeAudit(d, { companyId: u.companyId, actorId: u.id, actionType: "user_logout", entityType: "user", entityId: u.id }));
-  }
   await clearUserSession();
 }
 
 // ── Password reset ─────────────────────────────────────────────────────────
 
-export function requestPasswordReset(email: string): { devCode: string; exists: boolean } {
-  const user = findUserByEmail(email);
-  // Always behave the same to avoid leaking which emails exist.
-  if (!user) return { devCode: "", exists: false };
-  return { devCode: pushCode(user.email, "password_reset"), exists: true };
+export async function requestPasswordReset(email: string): Promise<void> {
+  try {
+    await apiRequest("POST", "/api/auth/request-password-reset", { email: email.trim().toLowerCase() });
+  } catch {
+    // The endpoint always responds the same way regardless of whether the email
+    // exists, by design — nothing to surface to the user either way.
+  }
 }
 
 export async function resetPassword(email: string, code: string, newPassword: string): Promise<void> {
-  const e = email.trim().toLowerCase();
-  const rec = getDB().devCodes.find((c) => c.email === e && c.kind === "password_reset");
-  if (!rec || new Date(rec.expiresAt).getTime() < Date.now())
-    throw new ServiceError("That reset code has expired.");
-  if (rec.code !== code.trim()) throw new ServiceError("Incorrect code.");
-  const pw = validatePassword(newPassword);
-  if (!pw.valid) throw new ServiceError(pw.message);
-  const user = findUserByEmail(e);
-  if (!user) throw new ServiceError("Account not found.");
-  mutate((d) => {
-    d.users = d.users.map((u) => (u.id === user.id ? { ...u, password: newPassword, updatedAt: nowISO() } : u));
-    d.devCodes = d.devCodes.filter((c) => !(c.email === e && c.kind === "password_reset"));
-    writeAudit(d, { companyId: user.companyId, actorId: user.id, actionType: "password_reset", entityType: "user", entityId: user.id });
-  });
+  try {
+    await apiRequest("POST", "/api/auth/reset-password", { email: email.trim().toLowerCase(), otp: code.trim(), newPassword });
+  } catch (e) {
+    rethrow(e, "Reset failed.");
+  }
 }
 
-// ── Invite acceptance ──────────────────────────────────────────────────────
+// ── Invite acceptance (real flow is two steps: set password, then confirm the
+//    emailed OTP — unlike the old one-step mock flow) ───────────────────────
 
-export function inviteByToken(token: string) {
-  const user = getDB().users.find((u) => u.inviteToken === token && u.status === "invited");
-  if (!user) return null;
-  const company = getDB().companies.find((c) => c.id === user.companyId) ?? null;
-  return { user, company };
+export async function previewInvite(token: string): Promise<{
+  email: string;
+  firstName: string;
+  lastName: string;
+  company: string | null;
+  role: string | null;
+  passwordSet: boolean;
+} | null> {
+  try {
+    return await apiRequest("GET", `/api/org/invites/accept?token=${encodeURIComponent(token)}`);
+  } catch {
+    return null;
+  }
 }
 
-export async function acceptInvite(input: {
-  token: string;
-  firstName?: string;
-  lastName?: string;
-  password: string;
-}): Promise<{ userId: string }> {
-  const found = inviteByToken(input.token);
-  if (!found) throw new ServiceError("This invitation is invalid or has already been used.");
-  const { user } = found;
-  if (user.inviteExpires && new Date(user.inviteExpires).getTime() < Date.now())
-    throw new ServiceError("This invitation has expired. Ask an admin to resend it.");
-  const pw = validatePassword(input.password);
-  if (!pw.valid) throw new ServiceError(pw.message);
+export async function startInviteAccept(input: { token: string; firstName?: string; lastName?: string; password: string }): Promise<{ email: string }> {
+  try {
+    const data = await apiRequest<{ email: string }>("POST", "/api/org/invites/accept", input);
+    return { email: data.email };
+  } catch (e) {
+    rethrow(e, "Could not start accepting the invitation.");
+  }
+}
 
-  mutate((d) => {
-    d.users = d.users.map((u) =>
-      u.id === user.id
-        ? {
-            ...u,
-            firstName: input.firstName?.trim() || u.firstName,
-            lastName: input.lastName?.trim() || u.lastName,
-            password: input.password,
-            status: "active",
-            isEmailVerified: true,
-            inviteToken: null,
-            inviteAcceptedAt: nowISO(),
-            lastLoginAt: nowISO(),
-            lastActiveAt: nowISO(),
-            updatedAt: nowISO(),
-          }
-        : u,
-    );
-    d.devInvites = d.devInvites.filter((i) => i.token !== input.token);
-    writeAudit(d, { companyId: user.companyId, actorId: user.id, actionType: "user_approved", entityType: "user", entityId: user.id });
-    notify(d, {
-      companyId: user.companyId,
-      userId: user.invitedBy ?? user.id,
-      type: "invite_accepted",
-      title: "Invitation accepted",
-      message: `${input.firstName || user.firstName} ${input.lastName || user.lastName} joined the workspace.`,
-      entityType: "user",
-      entityId: user.id,
-    });
-  });
-  await setUserSession(user.id);
-  return { userId: user.id };
+export async function confirmInviteAccept(input: { token: string; otp: string }): Promise<{ userId: string }> {
+  try {
+    const data = await apiRequest<VerifyResponse>("POST", "/api/org/invites/verify", { token: input.token, otp: input.otp.trim() });
+    await setRealSession({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user, company: data.company });
+    return { userId: data.user.id };
+  } catch (e) {
+    rethrow(e, "Could not confirm the invitation.");
+  }
 }
 
 // ── Profile ────────────────────────────────────────────────────────────────
 
-export function updateProfile(userId: string, patch: { firstName: string; lastName: string }): void {
-  if (!patch.firstName.trim() || !patch.lastName.trim()) throw new ServiceError("Name can't be empty.");
-  mutate((d) => {
-    const u = d.users.find((x) => x.id === userId);
-    d.users = d.users.map((x) =>
-      x.id === userId ? { ...x, firstName: patch.firstName.trim(), lastName: patch.lastName.trim(), updatedAt: nowISO() } : x,
-    );
-    if (u) writeAudit(d, { companyId: u.companyId, actorId: userId, actionType: "user_updated", entityType: "user", entityId: userId });
-  });
+export async function updateProfile(_userId: string, patch: { firstName: string; lastName: string }): Promise<void> {
+  try {
+    await apiRequest("PATCH", "/api/auth/profile", patch, getAccessToken());
+  } catch (e) {
+    rethrow(e, "Could not update your profile.");
+  }
 }
 
-export function changePassword(userId: string, oldPassword: string, newPassword: string): void {
-  const user = getDB().users.find((u) => u.id === userId);
-  if (!user) throw new ServiceError("Account not found.");
-  if (user.password !== oldPassword) throw new ServiceError("Your current password is incorrect.");
-  const pw = validatePassword(newPassword);
-  if (!pw.valid) throw new ServiceError(pw.message);
-  mutate((d) => {
-    d.users = d.users.map((x) => (x.id === userId ? { ...x, password: newPassword, updatedAt: nowISO() } : x));
-    writeAudit(d, { companyId: user.companyId, actorId: userId, actionType: "password_changed", entityType: "user", entityId: userId });
-  });
+export async function changePassword(_userId: string, oldPassword: string, newPassword: string): Promise<void> {
+  try {
+    await apiRequest("PATCH", "/api/auth/update-password", { oldPassword, newPassword, confirmPassword: newPassword }, getAccessToken());
+  } catch (e) {
+    rethrow(e, "Could not change your password.");
+  }
 }
 
-export function ping(userId: string): void {
-  mutate((d) => {
-    d.users = d.users.map((x) => (x.id === userId ? { ...x, lastActiveAt: nowISO() } : x));
-  });
+/** Refresh the access token using the stored refresh token; clears the session if it's no longer valid. */
+export async function refreshSession(): Promise<boolean> {
+  const real = getSession().real;
+  if (!real) return false;
+  try {
+    const data = await apiRequest<{ accessToken: string; refreshToken: string }>("POST", "/api/auth/refresh", { refreshToken: real.refreshToken });
+    await updateRealTokens(data.accessToken, data.refreshToken);
+    return true;
+  } catch {
+    await clearUserSession();
+    return false;
+  }
+}
+
+export function ping(): void {
+  const token = getAccessToken();
+  if (!token) return;
+  apiRequest("POST", "/api/auth/ping", undefined, token).catch(() => {});
 }
