@@ -104,6 +104,10 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [test, setTest] = useState<{ imapOk: boolean; smtpOk: boolean } | null>(null);
+  const [password, setPassword] = useState("");
+  const [samePassword, setSamePassword] = useState(true);
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const set = <K extends keyof MailboxInput>(k: K, v: MailboxInput[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -111,6 +115,10 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
     setForm(account ? { ...account } : DEFAULT_FORM);
     setProvider(account?.provider || null);
     setTest(null);
+    setError(null);
+    setPassword("");
+    setSmtpPassword("");
+    setSamePassword(true);
     setEditing(true);
   };
 
@@ -127,29 +135,49 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
     if (!p.known) setAdvancedOpen(true);
   };
 
-  const runTest = () => {
+  const runTest = async () => {
     setBusy(true);
-    setTimeout(() => {
-      setTest({ imapOk: true, smtpOk: true });
+    setError(null);
+    try {
+      const result = await testMailboxAccount(companyId, {
+        ...form,
+        imapPassword: password || undefined,
+        smtpPassword: (samePassword ? password : smtpPassword) || undefined,
+      });
+      setTest(result);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not test the connection.");
+    } finally {
       setBusy(false);
-    }, 500);
+    }
   };
 
-  const save = () => {
+  const save = async () => {
     setBusy(true);
+    setError(null);
     try {
-      saveMailboxAccount(actorId, companyId, form);
+      await saveMailboxAccount(actorId, companyId, {
+        ...form,
+        imapPassword: password || undefined,
+        smtpPassword: (samePassword ? password : smtpPassword) || undefined,
+      });
       setEditing(false);
       setTest(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the mailbox.");
     } finally {
       setBusy(false);
     }
   };
 
   const disconnect = () =>
-    confirmAction("Disconnect this mailbox?", "Existing tickets stay; new email stops coming in.", () => {
-      disconnectMailboxAccount(actorId, companyId);
-      setEditing(false);
+    confirmAction("Disconnect this mailbox?", "Existing tickets stay; new email stops coming in.", async () => {
+      try {
+        await disconnectMailboxAccount(actorId, companyId);
+        setEditing(false);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not disconnect the mailbox.");
+      }
     });
 
   const preset = provider ? PRESETS[provider] : null;
@@ -179,12 +207,15 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
             <div className="flex flex-row gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setBusy(true);
-                  setTimeout(() => {
-                    testMailboxAccount(companyId);
+                  try {
+                    await testMailboxAccount(companyId);
+                  } catch {
+                    // surfaced via the account's lastStatus on refresh
+                  } finally {
                     setBusy(false);
-                  }, 400);
+                  }
                 }}
                 disabled={busy}
                 className="inline-flex items-center gap-1 rounded-lg border border-hairline px-2.5 py-1.5 text-xs font-medium text-ink hover:border-ink disabled:opacity-40"
@@ -201,6 +232,7 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
           </div>
         ) : account || editing ? (
           <div className="flex flex-col gap-4">
+            {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div> : null}
             <div>
               <p className="mb-1.5 text-xs font-medium text-muted-foreground">Choose your email provider</p>
               <div className="flex flex-row flex-wrap gap-2">
@@ -262,6 +294,20 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
                   ))}
                 </select>
               </label>
+              <label className="col-span-2 text-xs font-medium text-muted-foreground">
+                Password{preset?.helpLabel ? " (App Password)" : ""}
+                {account ? <span className="font-normal text-muted-foreground/70">, leave blank to keep the current one</span> : null}
+                <input
+                  type="password"
+                  className={input}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (samePassword) setSmtpPassword(e.target.value);
+                  }}
+                  placeholder={account ? "••••••••" : "Paste your password here"}
+                />
+              </label>
             </div>
 
             <button type="button" onClick={() => setAdvancedOpen((v) => !v)} className="flex flex-row items-center gap-1 text-xs font-medium text-muted-foreground hover:text-ink">
@@ -297,6 +343,19 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
                   </label>
                   <label className="flex items-end gap-1 pb-1.5 text-xs font-medium text-muted-foreground">
                     <input type="checkbox" checked={form.smtpSecure} onChange={(e) => set("smtpSecure", e.target.checked)} /> SSL
+                  </label>
+                  <label className="col-span-2 text-xs font-medium text-muted-foreground">
+                    Password{" "}
+                    <span className="font-normal text-muted-foreground/70">{samePassword ? "(same as above)" : account ? "(blank = keep)" : ""}</span>
+                    <input
+                      type="password"
+                      className={input}
+                      value={samePassword ? password : smtpPassword}
+                      onChange={(e) => {
+                        setSmtpPassword(e.target.value);
+                        setSamePassword(false);
+                      }}
+                    />
                   </label>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
