@@ -260,7 +260,7 @@ export default function Dashboard() {
               ["Invite people", "/admin/people"],
               ["Edit reporting lines", "/admin/reporting"],
               ["Roles & ranks", "/admin/roles"],
-              ["Permission policy", "/admin/settings"],
+              ["Settings", "/admin/settings"],
             ] as const
           ).map(([label, href]) => (
             <button key={label} type="button" onClick={() => navigate(href)} className="rounded-lg border border-hairline bg-card px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink">
@@ -314,6 +314,16 @@ function Stat({
   );
 }
 
+/** Mirrors the web app's lib/perf.ts slipLabel(). */
+function slipLabel(avgDaysLate: number | null): string {
+  if (avgDaysLate == null) return "—";
+  if (Math.abs(avgDaysLate) < 0.1) return "on the day";
+  if (avgDaysLate < 0) return `${Math.abs(avgDaysLate).toFixed(1)}d early`;
+  return `${avgDaysLate.toFixed(1)}d late`;
+}
+
+const MEDAL = ["🥇", "🥈", "🥉"] as const;
+
 /** Real-backend performance, matching the web app's dashboard-home.tsx layout:
  *  org-wide pie (admin), leaderboard or personal card, department + business-unit
  *  grids, and one donut per person. Data and ranking come straight from
@@ -334,17 +344,43 @@ function RealPerformanceSection({ perf, navigate }: { perf: RealPerformance | nu
   return (
     <div className="flex flex-col gap-4">
       {perf.isAdmin && perf.org ? (
-        <Card className="flex flex-row flex-wrap items-center gap-5 p-4">
-          <div className="flex flex-col items-center gap-1">
-            <Donut value={perf.org.score} tone={colors.ink} />
-            <Text variant="caption">Company · {perf.org.headcount}</Text>
+        <Card className="p-4">
+          <div className="flex flex-row flex-wrap items-center gap-5">
+            <div className="flex flex-col items-center gap-1">
+              <Donut value={perf.org.score} tone={colors.ink} />
+              <Text variant="caption">Company on-time</Text>
+            </div>
+            <div className="min-w-0 flex-1">
+              <Text variant="heading">Organisation performance</Text>
+              <Text variant="caption" className="block">
+                Company-wide on-time delivery · {perf.org.headcount} people · last {perf.windowDays} days
+              </Text>
+            </div>
+            <dl className="grid grid-cols-3 gap-x-5 text-sm">
+              <div>
+                <dt className="text-[11px] text-muted-foreground">Delivered</dt>
+                <dd className="font-semibold tabular-nums text-ink">{perf.org.delivered}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] text-muted-foreground">On time</dt>
+                <dd className="font-semibold tabular-nums text-teal">{perf.org.onTime}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] text-muted-foreground">Overdue</dt>
+                <dd className="font-semibold tabular-nums text-destructive">{perf.org.openOverdue}</dd>
+              </div>
+            </dl>
           </div>
-          <div className="min-w-0 flex-1">
-            <Text variant="heading">Everyone · on-time delivery</Text>
-            <Text variant="caption" className="block">
-              Every person in the company, ranked · last {perf.windowDays} days
-            </Text>
-          </div>
+          {perf.org.departments.length > 0 ? (
+            <div className="mt-3 flex flex-row flex-wrap gap-x-4 gap-y-1 border-t border-hairline pt-2.5">
+              {perf.org.departments.map((d) => (
+                <div key={d.id} className="flex flex-row items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground">{d.name}</span>
+                  <span className="font-semibold text-ink">{d.score == null ? "—" : `${d.score}%`}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -364,10 +400,14 @@ function RealPerformanceSection({ perf, navigate }: { perf: RealPerformance | nu
           <div className="divide-y divide-hairline/60">
             {perf.people.slice(0, 8).map((p) => (
               <div key={p.id} className="flex flex-row items-center gap-3 px-4 py-2">
-                <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{p.rank ?? "—"}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-ink">{p.name}</span>
+                <span className="w-5 shrink-0 text-center text-[13px]">{p.rank && p.rank <= 3 ? MEDAL[p.rank - 1] : <span className="text-[11px] tabular-nums text-muted-foreground">{p.rank ?? "—"}</span>}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-ink">{p.name}</p>
+                  <Text variant="caption">
+                    {p.onTime}/{p.delivered} on time{p.avgDaysLate != null ? ` · ${slipLabel(p.avgDaysLate)}` : ""}
+                  </Text>
+                </div>
                 {p.role ? <span className="shrink-0 text-[11px] text-muted-foreground">{p.role}</span> : null}
-                <span className="shrink-0 text-[11px] text-muted-foreground">{p.delivered} done</span>
                 <span className="w-12 shrink-0 text-right text-sm font-semibold text-ink">{p.score == null ? "—" : `${p.score}%`}</span>
               </div>
             ))}
@@ -415,7 +455,9 @@ function RealPerformanceSection({ perf, navigate }: { perf: RealPerformance | nu
                 <Donut value={p.score} size={44} strokeWidth={5} />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-ink">{p.name}</p>
-                  <Text variant="caption">{p.delivered} completed</Text>
+                  <Text variant="caption">
+                    {p.onTime}/{p.delivered} on time
+                  </Text>
                 </div>
               </Card>
             ))}
@@ -430,7 +472,7 @@ function RealPerformanceSection({ perf, navigate }: { perf: RealPerformance | nu
               ["Invite people", "/admin/people"],
               ["Edit reporting lines", "/admin/reporting"],
               ["Roles & ranks", "/admin/roles"],
-              ["Permission policy", "/admin/settings"],
+              ["Settings", "/admin/settings"],
             ] as const
           ).map(([label, href]) => (
             <button key={label} type="button" onClick={() => navigate(href)} className="rounded-lg border border-hairline bg-card px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink">
@@ -458,8 +500,9 @@ function UnitGrid({ title, units }: { title: string; units: RealPerformance["byU
               <Donut value={u.score} size={44} strokeWidth={5} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-ink">{u.name}</p>
-                <Text variant="caption">
-                  {u.delivered} completed · {u.memberCount} {u.memberCount === 1 ? "person" : "people"}
+                <Text variant="caption">{u.memberCount === 1 ? "1 person" : `${u.memberCount} people`}</Text>
+                <Text variant="caption" className="block">
+                  {u.delivered} delivered · {u.onTime} on time
                 </Text>
               </div>
             </Card>

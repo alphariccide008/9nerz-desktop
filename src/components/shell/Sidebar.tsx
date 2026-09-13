@@ -6,8 +6,9 @@ import { Text } from "../ui/Text";
 import { Avatar } from "../ui/Avatar";
 import { cn } from "../../lib/cn";
 import { colors } from "../../lib/theme";
-import { billingNav, manageNav, NavItem, primaryNav } from "./nav";
-import { useAwaitingTicketCount, useCurrentUser, useIsAdmin, useUnreadCount } from "../../lib/hooks";
+import { manageNav, NavItem, primaryNav } from "./nav";
+import { useAwaitingTicketCount, useCompany, useCurrentUser, useIsAdmin, useUnreadCount } from "../../lib/hooks";
+import { useDB } from "../../lib/db/store";
 import { fullName } from "../../lib/util";
 import { logout } from "../../lib/services/auth";
 
@@ -41,8 +42,10 @@ export function SidebarContent() {
   const navigate = useNavigate();
   const me = useCurrentUser();
   const isAdmin = useIsAdmin();
+  const company = useCompany();
   const unread = useUnreadCount();
   const awaitingTickets = useAwaitingTicketCount();
+  const roleName = useDB((db) => db.roles.find((r) => r.id === db.users.find((u) => u.id === me?.id)?.roleId)?.name ?? null);
   const isActive = (href: string) => location.pathname === href || location.pathname.startsWith(href + "/");
 
   const badgeFor = (href: string) =>
@@ -53,6 +56,19 @@ export function SidebarContent() {
       <div className="border-b border-hairline px-4 pb-4 pt-5">
         <Wordmark size={26} />
       </div>
+
+      {me ? (
+        <div className="shrink-0 px-4 pt-3">
+          <span className="inline-flex items-center rounded-full border border-hairline bg-muted/60 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate">
+            {isAdmin ? "Company Admin" : roleName || "Member"}
+          </span>
+          {company ? (
+            <Text variant="caption" className="mt-1 block truncate">
+              {company.name}
+            </Text>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex-1 overflow-y-auto px-2 pb-3 pt-1">
         <SectionLabel>Menu</SectionLabel>
         {primaryNav.map((item) => (
@@ -65,7 +81,6 @@ export function SidebarContent() {
             {manageNav.map((item) => (
               <Row key={item.href} item={item} active={isActive(item.href)} />
             ))}
-            <Row item={billingNav} active={isActive(billingNav.href)} />
           </>
         ) : null}
       </div>

@@ -1,7 +1,6 @@
 import {
   Bell,
   Building2,
-  CheckSquare,
   CreditCard,
   GitBranch,
   Inbox,
@@ -31,10 +30,8 @@ export const manageNav: NavItem[] = [
   { label: "Roles", href: "/admin/roles", icon: GitBranch },
   { label: "People", href: "/admin/people", icon: Users },
   { label: "Reporting", href: "/admin/reporting", icon: Network },
-  { label: "Approvals", href: "/approvals", icon: CheckSquare },
   { label: "Email routing", href: "/admin/routing", icon: Mail },
-  { label: "Permission policy", href: "/admin/settings", icon: Settings },
-  { label: "Audit trail", href: "/admin/audit", icon: ShieldCheck },
+  { label: "Settings", href: "/admin/settings", icon: Settings },
+  { label: "Billing", href: "/billing", icon: CreditCard },
+  { label: "Audit Trail", href: "/admin/audit", icon: ShieldCheck },
 ];
-
-export const billingNav: NavItem = { label: "Billing", href: "/billing", icon: CreditCard };
