@@ -23,9 +23,9 @@ export default function Roles() {
 
   if (!me) return null;
 
-  const wrap = (fn: () => void, msg: string) => {
+  const wrap = async (fn: () => unknown, msg: string) => {
     try {
-      fn();
+      await fn();
       toast.show(msg, "success");
     } catch (e) {
       toast.show(e instanceof Error ? e.message : "Failed", "error");
@@ -38,13 +38,13 @@ export default function Roles() {
         <PageHeader title="Roles" subtitle="Each role has a rank (top = most senior) and a default 'reports to' role." />
 
         <div className="flex flex-row gap-2">
-          <Input containerClassName="flex-1" value={name} onChange={(e) => setName(e.target.value)} placeholder="New role name (e.g. Team Lead)" onKeyDown={(e) => e.key === "Enter" && name.trim() && wrap(() => { createRole(me.id, name); setName(""); }, "Role added")} />
+          <Input containerClassName="flex-1" value={name} onChange={(e) => setName(e.target.value)} placeholder="New role name (e.g. Team Lead)" onKeyDown={(e) => e.key === "Enter" && name.trim() && wrap(async () => { await createRole(me.id, name); setName(""); }, "Role added")} />
           <Button
             title="Add"
             icon={<Plus size={15} color={colors.white} />}
             onPress={() =>
-              wrap(() => {
-                createRole(me.id, name);
+              wrap(async () => {
+                await createRole(me.id, name);
                 setName("");
               }, "Role added")
             }

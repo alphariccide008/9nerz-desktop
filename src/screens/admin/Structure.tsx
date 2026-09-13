@@ -32,9 +32,9 @@ export default function Structure() {
 
   if (!me) return null;
 
-  const submitCreate = () => {
+  const submitCreate = async () => {
     try {
-      createUnit(me.id, { name, unitType, parentUnitId: creating?.parentId ?? null });
+      await createUnit(me.id, { name, unitType, parentUnitId: creating?.parentId ?? null });
       toast.show("Unit created", "success");
       setCreating(null);
       setName("");

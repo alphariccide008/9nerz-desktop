@@ -35,7 +35,7 @@ export default function Onboarding() {
     const s = onboardingStatus(me.id);
     if (!s.needsOnboarding) navigate("/dashboard", { replace: true });
     if (units.length) setStep((x) => Math.max(x, 2));
-    if (units.length && roles.length > 1) setStep((x) => Math.max(x, 3));
+    if (units.length && roles.some((r) => !r.isAdminRole)) setStep((x) => Math.max(x, 3));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, units.length, roles.length]);
 
@@ -44,11 +44,11 @@ export default function Onboarding() {
 
   if (!me) return null;
 
-  const addUnit = () => {
+  const addUnit = async () => {
     setError(null);
     setBusy(true);
     try {
-      createUnit(me.id, { name: unitName, unitType });
+      await createUnit(me.id, { name: unitName, unitType });
       setUnitName("");
       setStep(2);
     } catch (e) {
@@ -58,11 +58,11 @@ export default function Onboarding() {
     }
   };
 
-  const addRole = () => {
+  const addRole = async () => {
     setError(null);
     setBusy(true);
     try {
-      createRole(me.id, roleName);
+      await createRole(me.id, roleName);
       setRoleName("");
       setStep(3);
     } catch (e) {
@@ -72,11 +72,11 @@ export default function Onboarding() {
     }
   };
 
-  const finish = () => {
+  const finish = async () => {
     setError(null);
     setBusy(true);
     try {
-      finishOnboarding(me.id, pickUnit || units[0]?.id, pickRole || roles.find((r) => !r.isAdminRole)?.id || roles[0]?.id);
+      await finishOnboarding(me.id, pickUnit || units[0]?.id, pickRole || roles.find((r) => !r.isAdminRole)?.id || roles[0]?.id);
       toast.show("You're all set", "success");
       navigate("/dashboard", { replace: true });
     } catch (e) {

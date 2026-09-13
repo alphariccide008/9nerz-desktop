@@ -14,6 +14,9 @@ import {
   User,
 } from "../db/schema";
 import { uid, nowISO, fullName } from "../util";
+import { apiRequest, ApiError } from "../api/http";
+import { getSession, getAccessToken } from "../session";
+import { syncRealOrgData } from "./orgSync";
 import {
   ServiceError,
   writeAudit,
@@ -174,14 +177,28 @@ export function onboardingStatus(userId: string): { needsOnboarding: boolean; is
   if (!me) return { needsOnboarding: false, isCompanyAdmin: false };
   const hasUnit = db.userOrgUnits.some((l) => l.userId === userId);
   const companyUnits = db.orgUnits.some((u) => u.companyId === me.companyId);
-  const companyRoles = db.roles.filter((r) => r.companyId === me.companyId).length > 1; // >1 = beyond the seeded admin role
+  // A real company's roles are exactly what's on the backend — no seeded "admin
+  // placeholder" role to discount, unlike the local mock signup flow — so this
+  // just needs at least one non-admin role to exist, not more than one role.
+  const companyRoles = db.roles.some((r) => r.companyId === me.companyId && !r.isAdminRole);
   return {
     needsOnboarding: me.isCompanyAdmin && (!companyUnits || !companyRoles || !hasUnit),
     isCompanyAdmin: me.isCompanyAdmin,
   };
 }
 
-export function finishOnboarding(userId: string, unitId: string, roleId: string): void {
+export async function finishOnboarding(userId: string, unitId: string, roleId: string): Promise<void> {
+  const real = getSession().real;
+  if (real) {
+    try {
+      await apiRequest("POST", "/api/org/onboarding", { unitId, roleId }, getAccessToken());
+      await syncRealOrgData();
+      return;
+    } catch (e) {
+      throw new ServiceError(e instanceof ApiError ? e.message : "Could not finish setup.");
+    }
+  }
+
   mutate((d) => {
     const me = d.users.find((u) => u.id === userId);
     if (!me) throw new ServiceError("User not found");
@@ -213,10 +230,37 @@ function assertUnitLimit(companyId: string, unitType: UnitType) {
     );
 }
 
-export function createUnit(
+export async function createUnit(
   actorId: string,
   input: { name: string; unitType: UnitType; parentUnitId?: string | null },
-): OrgUnit {
+): Promise<OrgUnit> {
+  const real = getSession().real;
+  if (real) {
+    try {
+      const { unit } = await apiRequest<{ unit: { id: string; name: string; unit_type: string; parent_unit_id: string | null; has_top_role: boolean; locked_at: string | null; created_at: string } }>(
+        "POST",
+        "/api/org/units",
+        { name: input.name.trim(), unit_type: input.unitType, parent_unit_id: input.parentUnitId ?? null },
+        getAccessToken(),
+      );
+      await syncRealOrgData();
+      return {
+        id: unit.id,
+        companyId: real.user.companyId,
+        parentUnitId: unit.parent_unit_id,
+        name: unit.name,
+        unitType: unit.unit_type as UnitType,
+        hasTopRole: unit.has_top_role,
+        createdBy: actorId,
+        lockedAt: unit.locked_at,
+        createdAt: unit.created_at,
+        updatedAt: unit.created_at,
+      };
+    } catch (e) {
+      throw new ServiceError(e instanceof ApiError ? e.message : "Could not create the unit.");
+    }
+  }
+
   const db = getDB();
   const actor = userById(db, actorId);
   if (!actor) throw new ServiceError("Not found", "not_found");
@@ -281,7 +325,32 @@ export function deleteUnit(actorId: string, unitId: string): void {
 
 // ── Roles CRUD ─────────────────────────────────────────────────────────────
 
-export function createRole(actorId: string, name: string): Role {
+export async function createRole(actorId: string, name: string): Promise<Role> {
+  const real = getSession().real;
+  if (real) {
+    try {
+      const { role } = await apiRequest<{ role: { id: string; name: string; rank: number; reports_to_role_id: string | null; is_admin_role: boolean; created_at: string } }>(
+        "POST",
+        "/api/org/roles",
+        { name: name.trim() },
+        getAccessToken(),
+      );
+      await syncRealOrgData();
+      return {
+        id: role.id,
+        companyId: real.user.companyId,
+        name: role.name,
+        rank: role.rank,
+        reportsToRoleId: role.reports_to_role_id,
+        isAdminRole: role.is_admin_role,
+        createdAt: role.created_at,
+        updatedAt: role.created_at,
+      };
+    } catch (e) {
+      throw new ServiceError(e instanceof ApiError ? e.message : "Could not create the role.");
+    }
+  }
+
   const db = getDB();
   const actor = userById(db, actorId);
   if (!actor?.isCompanyAdmin) throw new ServiceError("Only an admin can manage roles.", "forbidden");

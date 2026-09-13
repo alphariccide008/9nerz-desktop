@@ -5,12 +5,13 @@ import { useCurrentUser, useUnreadCount } from "../lib/hooks";
 import { useSession } from "../lib/session";
 import { onboardingStatus } from "../lib/services/org";
 import { ping } from "../lib/services/auth";
+import { syncRealOrgData } from "../lib/services/orgSync";
 import { updateTaskbarBadge } from "../lib/badge";
 
 const SIDEBAR_W = 248;
 
 export default function AppLayout() {
-  const { ready, userId } = useSession();
+  const { ready, userId, real } = useSession();
   const me = useCurrentUser();
   const navigate = useNavigate();
   const unread = useUnreadCount();
@@ -42,6 +43,13 @@ export default function AppLayout() {
     const t = setInterval(() => ping(), 30_000);
     return () => clearInterval(t);
   }, [userId]);
+
+  useEffect(() => {
+    if (!real) return;
+    syncRealOrgData();
+    const t = setInterval(() => syncRealOrgData(), 60_000);
+    return () => clearInterval(t);
+  }, [real?.user.id]);
 
   if (!ready || !me) return <div className="h-screen w-screen bg-background" />;
 
