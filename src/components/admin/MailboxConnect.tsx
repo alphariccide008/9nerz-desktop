@@ -91,8 +91,8 @@ const DEFAULT_FORM: MailboxInput = {
 };
 
 const STATUS_STYLE: Record<string, [string, string]> = {
-  ok: ["bg-teal/15 text-teal", "Connected"],
-  pending: ["bg-amber/20 text-[#8a5a12]", "Not tested"],
+  ok: ["bg-emerald-100 text-emerald-700", "Connected"],
+  pending: ["bg-amber-100 text-amber-700", "Not tested"],
 };
 
 export function MailboxConnect({ companyId, actorId, units }: { companyId: string; actorId: string; units: { id: string; name: string }[] }) {
@@ -312,7 +312,7 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
 
             <button type="button" onClick={() => setAdvancedOpen((v) => !v)} className="flex flex-row items-center gap-1 text-xs font-medium text-muted-foreground hover:text-ink">
               <ChevronDown size={14} className={cn("transition-transform", advancedOpen && "rotate-180")} />
-              Advanced settings (server, port)
+              Advanced settings (server, port, custom logins)
             </button>
 
             {advancedOpen ? (
@@ -377,10 +377,10 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
             {test ? (
               <div className="flex flex-col gap-1 rounded-lg border border-hairline bg-background p-2 text-xs">
                 <p className="flex flex-row items-center gap-1.5">
-                  {test.imapOk ? <CheckCircle2 size={13} color={colors.teal} /> : <XCircle size={13} color={colors.destructive} />} IMAP connected
+                  {test.imapOk ? <CheckCircle2 size={13} className="text-emerald-600" /> : <XCircle size={13} color={colors.destructive} />} IMAP connected
                 </p>
                 <p className="flex flex-row items-center gap-1.5">
-                  {test.smtpOk ? <CheckCircle2 size={13} color={colors.teal} /> : <XCircle size={13} color={colors.destructive} />} SMTP connected
+                  {test.smtpOk ? <CheckCircle2 size={13} className="text-emerald-600" /> : <XCircle size={13} color={colors.destructive} />} SMTP connected
                 </p>
               </div>
             ) : null}
@@ -407,8 +407,8 @@ export function MailboxConnect({ companyId, actorId, units }: { companyId: strin
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
-              Point 9nerz at an existing support inbox (e.g. <code>support@yourcompany.com</code>). Pick your provider below — Gmail, Outlook, Zoho, Yahoo and most business hosting all work with
-              just an email and a password.
+              Point 9nerz at an existing support inbox (e.g. <code>support@yourcompany.com</code>). We check it for new mail every couple of minutes and send replies from that same address. Pick
+              your provider below: Gmail, Outlook, Zoho, Yahoo and most business hosting all work with just an email and a password.
             </p>
             <button type="button" onClick={startEdit} className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-sm font-semibold text-white hover:brightness-110">
               <Plug size={15} /> Connect a mailbox

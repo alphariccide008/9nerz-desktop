@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Check, Copy, Mail, MailPlus, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Copy, Lock, Mail, MailPlus, Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { Screen, PageHeader } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
@@ -16,7 +16,8 @@ import { MailboxConnect } from "../../components/admin/MailboxConnect";
 import { useCurrentUser } from "../../lib/hooks";
 import { useDB } from "../../lib/db/store";
 import { addInbox, addRoutingRule, deleteRoutingRule, listInboxes, listRoutingRules } from "../../lib/services/tickets";
-import { listUnits } from "../../lib/services/org";
+import { fetchRealPlanStatus, listUnits } from "../../lib/services/org";
+import { billingStatus } from "../../lib/services/billing";
 import { confirmAction } from "../../lib/confirm";
 import { colors } from "../../lib/theme";
 
@@ -32,6 +33,7 @@ export default function Routing() {
   const [ruleUnit, setRuleUnit] = useState<string | null>(null);
   const [ruleInbox, setRuleInbox] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [freePlan, setFreePlan] = useState(false);
 
   const copy = (address: string) => {
     navigator.clipboard?.writeText(address);
@@ -42,6 +44,18 @@ export default function Routing() {
   const inboxes = useMemo(() => (me ? listInboxes(me.companyId) : []), [me, tick]);
   const rules = useMemo(() => (me ? listRoutingRules(me.companyId) : []), [me, tick]);
   const units = useMemo(() => (me ? listUnits(me.companyId).units : []), [me, tick]);
+
+  useEffect(() => {
+    if (!me) return;
+    let cancelled = false;
+    fetchRealPlanStatus().then((p) => {
+      if (cancelled) return;
+      setFreePlan(p ? p.effectiveTier === "free" : billingStatus(me.companyId).effectiveTier === "free");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [me]);
 
   if (!me) return null;
 
@@ -59,34 +73,53 @@ export default function Routing() {
       <Screen>
         <PageHeader
           title="Email routing"
-          subtitle="Inbound addresses and the rules that sort mail into queues."
+          subtitle="Give customers an address to email. Rules send each ticket to the right department; anything unmatched lands in your Unrouted queue."
           right={<Button title="Simulate inbound" size="sm" variant="outline" icon={<MailPlus size={14} color={colors.ink} />} onPress={() => navigate("/tickets/simulate-inbound")} />}
         />
 
-        <MailboxConnect companyId={me.companyId} actorId={me.id} units={units} />
-
-        <Text variant="caption" className="pt-1 font-semibold uppercase tracking-wide text-muted-foreground">
-          …or use a 9nerz-hosted address
-        </Text>
-
-        <div>
-          <div className="mb-2 flex flex-row items-center justify-between">
-            <Text variant="heading">Inboxes</Text>
-            <Button title="Add" size="sm" variant="outline" icon={<Plus size={13} color={colors.ink} />} onPress={() => setInboxOpen(true)} />
-          </div>
-          <Card>
-            {inboxes.map((i, n) => (
-              <div key={i.id} className={`flex flex-row items-center gap-2 px-4 py-3 ${n > 0 ? "border-t border-hairline/60" : ""}`}>
-                <Mail size={14} color={colors.slate} />
-                <code className="flex-1 truncate text-[13px] text-ink">{i.address}</code>
-                {i.isDefault ? <Text variant="caption">default</Text> : null}
-                <button type="button" onClick={() => copy(i.address)} className="shrink-0 rounded p-1 text-slate hover:bg-background" title="Copy address">
-                  {copied === i.address ? <Check size={14} color={colors.teal} /> : <Copy size={14} />}
-                </button>
-              </div>
-            ))}
+        {freePlan ? (
+          <Card className="border-amber/40 bg-amber/10 p-5">
+            <Text variant="heading" className="flex flex-row items-center gap-2">
+              <Sparkles size={16} color={colors.ink} /> Email-to-ticket is an Unlimited feature
+            </Text>
+            <Text variant="caption" className="mt-1.5 block text-ink">
+              Turn customer emails into tracked tickets. Connect your own support mailbox or use a 9nerz-hosted address. Available on the Unlimited plan.
+            </Text>
+            <Button title="Upgrade to Unlimited" size="sm" variant="amber" className="mt-3 rounded-full" onPress={() => navigate("/billing")} />
+            {inboxes.length > 0 || rules.length > 0 ? (
+              <Text variant="caption" className="mt-3 flex items-center gap-1.5 text-[11px] text-[#8a6d1f]">
+                <Lock size={12} /> Your existing inboxes and rules are paused. They return when you upgrade.
+              </Text>
+            ) : null}
           </Card>
-        </div>
+        ) : (
+          <>
+            <MailboxConnect companyId={me.companyId} actorId={me.id} units={units} />
+
+            <Text variant="caption" className="pt-1 font-semibold uppercase tracking-wide text-muted-foreground">
+              …or use a 9nerz-hosted address
+            </Text>
+
+            <div>
+              <div className="mb-2 flex flex-row items-center justify-between">
+                <Text variant="heading">Inboxes</Text>
+                <Button title="Add" size="sm" variant="outline" icon={<Plus size={13} color={colors.ink} />} onPress={() => setInboxOpen(true)} />
+              </div>
+              <Card>
+                {inboxes.map((i, n) => (
+                  <div key={i.id} className={`flex flex-row items-center gap-2 px-4 py-3 ${n > 0 ? "border-t border-hairline/60" : ""}`}>
+                    <Mail size={14} color={colors.slate} />
+                    <code className="flex-1 truncate text-[13px] text-ink">{i.address}</code>
+                    {i.isDefault ? <Text variant="caption">default</Text> : null}
+                    <button type="button" onClick={() => copy(i.address)} className="shrink-0 rounded p-1 text-slate hover:bg-background" title="Copy address">
+                      {copied === i.address ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                ))}
+              </Card>
+            </div>
+          </>
+        )}
 
         <div>
           <div className="mb-2 flex flex-row items-center justify-between">
@@ -96,7 +129,7 @@ export default function Routing() {
           <Card>
             {rules.length === 0 ? (
               <Text variant="caption" className="block p-4 text-center">
-                No rules — everything goes to the Unrouted queue.
+                No rules, every ticket goes to Unrouted.
               </Text>
             ) : (
               rules.map((r, n) => (
@@ -115,6 +148,12 @@ export default function Routing() {
             )}
           </Card>
         </div>
+
+        <Text variant="caption" className="block text-[11px]">
+          Inbound email needs a provider (Postmark / Mailgun / SendGrid) pointed at your hosted domain with its webhook
+          set to receive tickets. Ask your admin to finish that setup. Until then you can still create and work
+          tickets, just not receive them by email.
+        </Text>
 
         <Sheet
           visible={inboxOpen}

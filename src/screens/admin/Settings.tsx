@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Download, Trash2 } from "lucide-react";
+import { AlertTriangle, Download, ShieldCheck, Trash2 } from "lucide-react";
 
 import { Screen, PageHeader } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
@@ -100,37 +100,43 @@ export default function AdminSettings() {
   return (
     <AdminGuard>
       <Screen maxWidth={840}>
-        <PageHeader title="Permission policy" subtitle="These rules decide what managers can do without an admin. Admins always bypass them." />
+        <PageHeader
+          title={
+            <>
+              <ShieldCheck size={18} color={colors.ink} /> Permission policy
+            </>
+          }
+          subtitle="These rules decide what managers can do without an admin. Admins always bypass them."
+        />
 
         {RADIO_FIELDS.map((f) => (
-          <Card key={f.key} className="flex flex-col gap-2 p-4">
+          <Card key={f.key} className="flex flex-col gap-1.5 p-4">
             <Text variant="heading">{f.label}</Text>
             {f.options.map(([v, label]) => {
               const active = (policy as unknown as Record<string, unknown>)[f.key] === v;
               return (
-                <button key={v} type="button" onClick={() => save({ [f.key]: v } as Partial<PermissionPolicy>)} className="flex flex-row items-center gap-2.5 py-1 text-left">
-                  <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${active ? "border-ink bg-ink" : "border-hairline"}`}>{active ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}</span>
-                  <span className="text-[13px] text-ink">{label}</span>
-                </button>
+                <label key={v} className="flex items-center gap-2 py-0.5 text-[13px] text-ink">
+                  <input type="radio" name={f.key} checked={active} onChange={() => save({ [f.key]: v } as Partial<PermissionPolicy>)} />
+                  {label}
+                </label>
               );
             })}
           </Card>
         ))}
 
-        <Card className="flex flex-col gap-2 p-4">
+        <Card className="flex flex-col gap-1.5 p-4">
           <Text variant="heading">Which actions need admin approval first?</Text>
           {APPROVALS.map(([v, label]) => {
             const on = policy.approvalRequiredFor.includes(v);
             return (
-              <button
-                key={v}
-                type="button"
-                onClick={() => save({ approvalRequiredFor: on ? policy.approvalRequiredFor.filter((x) => x !== v) : [...policy.approvalRequiredFor, v] })}
-                className="flex flex-row items-center gap-2.5 py-1 text-left"
-              >
-                <span className={`flex h-4 w-4 items-center justify-center rounded border ${on ? "border-ink bg-ink" : "border-hairline"}`}>{on ? <Check size={11} color="#fff" /> : null}</span>
-                <span className="text-[13px] text-ink">{label}</span>
-              </button>
+              <label key={v} className="flex items-center gap-2 py-0.5 text-[13px] text-ink">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(e) => save({ approvalRequiredFor: e.target.checked ? [...policy.approvalRequiredFor, v] : policy.approvalRequiredFor.filter((x) => x !== v) })}
+                />
+                {label}
+              </label>
             );
           })}
         </Card>
@@ -152,31 +158,31 @@ export default function AdminSettings() {
 
         <Card className="flex flex-col gap-2 p-4">
           <Text variant="heading">Your data</Text>
-          <Text variant="caption">Export everything this workspace has stored, or permanently delete it.</Text>
-          <Button title="Export all data (JSON)" variant="outline" icon={<Download size={14} color={colors.ink} />} onPress={exportData} />
-        </Card>
-
-        <Card className="flex flex-col gap-2 border-destructive/30 p-4">
-          <Text variant="heading" className="text-destructive">
-            Danger zone
+          <Text variant="caption">
+            You can export a full copy of your organization&apos;s data, or permanently delete the organization and everything in it.
           </Text>
-          <Text variant="caption">Permanently delete this workspace — every unit, member, task and ticket. This can't be undone.</Text>
-          <Button
-            title="Delete workspace"
-            variant="outline"
-            icon={<Trash2 size={14} color={colors.destructive} />}
-            onPress={() => {
-              setConfirmName("");
-              setDeleteOpen(true);
-            }}
-          />
+          <div className="flex flex-row flex-wrap gap-2">
+            <Button title="Export all data (JSON)" size="sm" variant="outline" icon={<Download size={14} color={colors.ink} />} onPress={exportData} />
+            <Button
+              title="Delete organization"
+              size="sm"
+              variant="outline"
+              className="border-destructive/40 text-destructive"
+              icon={<Trash2 size={14} color={colors.destructive} />}
+              onPress={() => {
+                setConfirmName("");
+                setDeleteOpen(true);
+              }}
+            />
+          </div>
         </Card>
       </Screen>
 
-      <Sheet visible={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete this workspace?" footer={<Button title="Permanently delete" fullWidth onPress={deleteOrg} disabled={confirmName.trim() !== companyName} />}>
+      <Sheet visible={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete this organization?" footer={<Button title="Permanently delete" fullWidth onPress={deleteOrg} disabled={confirmName.trim() !== companyName} />}>
         <div className="flex flex-col gap-3">
-          <Text variant="caption">
-            Type <span className="font-semibold text-ink">{companyName}</span> to confirm. This deletes every unit, member, task and ticket immediately and can't be undone.
+          <Text variant="caption" className="flex items-start gap-1.5 text-destructive">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            This permanently deletes every unit, role, person, task, ticket and file. It cannot be undone. Type your organization's name to confirm.
           </Text>
           <Input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} placeholder={companyName} />
         </div>

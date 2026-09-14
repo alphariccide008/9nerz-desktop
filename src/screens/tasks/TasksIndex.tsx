@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Clock, Plus } from "lucide-react";
 
 import { Screen, PageHeader } from "../../components/ui/Screen";
@@ -11,10 +10,11 @@ import { StatusPill } from "../../components/ui/Badge";
 import { EmptyState } from "../../components/ui/Feedback";
 import { useCurrentUser } from "../../lib/hooks";
 import { useDB } from "../../lib/db/store";
-import { listTasks, TaskScope } from "../../lib/services/tasks";
+import { listTasks, TaskScope, assignableTo } from "../../lib/services/tasks";
 import { fullName, isOverdue, shortDate } from "../../lib/util";
 import { colors } from "../../lib/theme";
 import { TaskDetailContent } from "./TaskDetail";
+import { NewTaskDialog } from "./NewTaskDialog";
 
 const TABS: { value: TaskScope; label: string }[] = [
   { value: "mine", label: "My tasks" },
@@ -24,12 +24,21 @@ const TABS: { value: TaskScope; label: string }[] = [
 
 export default function TasksIndex() {
   const me = useCurrentUser();
-  const navigate = useNavigate();
   const [tab, setTab] = useState<TaskScope>("mine");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [showNew, setShowNew] = useState(false);
   const tick = useDB((db) => db.tasks.map((t) => t.updatedAt).join(","));
 
   const tasks = useMemo(() => (me ? listTasks(me.id, tab) : []), [me, tab, tick]);
+  // Real web app only shows "New task" / the manager-only tabs to people who
+  // have at least one report — an individual contributor just sees "My tasks".
+  const people = useMemo(() => (me ? assignableTo(me.id) : []), [me, tick]);
+  const canCreate = people.length > 0;
+  const visibleTabs = canCreate ? TABS : TABS.filter((t) => t.value === "mine");
+
+  useEffect(() => {
+    if (!canCreate && tab !== "mine") setTab("mine");
+  }, [canCreate, tab]);
 
   useEffect(() => {
     if (!openId) return;
@@ -45,8 +54,11 @@ export default function TasksIndex() {
   return (
     <>
     <Screen>
-      <PageHeader title="Tasks" right={<Button title="New task" size="sm" icon={<Plus size={15} color={colors.white} />} onPress={() => navigate("/tasks/new")} />} />
-      <Segmented options={TABS} value={tab} onChange={setTab} />
+      <PageHeader
+        title="Tasks"
+        right={canCreate ? <Button title="New task" size="sm" icon={<Plus size={15} color={colors.white} />} onPress={() => setShowNew(true)} /> : undefined}
+      />
+      {visibleTabs.length > 1 ? <Segmented options={visibleTabs} value={tab} onChange={setTab} /> : null}
 
       {tasks.length === 0 ? (
         <EmptyState title="Nothing here yet" body={tab === "assigned" ? "Tasks you create for your reports will show up here." : "You're all caught up."} />
@@ -96,6 +108,17 @@ export default function TasksIndex() {
           <TaskDetailContent taskId={openId} onClose={() => setOpenId(null)} />
         </div>
       </div>
+    ) : null}
+
+    {showNew ? (
+      <NewTaskDialog
+        people={people}
+        onClose={() => setShowNew(false)}
+        onDone={() => {
+          setShowNew(false);
+          setTab("assigned");
+        }}
+      />
     ) : null}
     </>
   );

@@ -1,10 +1,20 @@
 import { ReactNode, useEffect, useState } from "react";
-import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { hydrate } from "./lib/db/store";
 import { loadSession, useSession } from "./lib/session";
 import { ToastProvider } from "./components/ui/Toast";
+import { ChatWidget } from "./components/chat/ChatWidget";
 import Splash from "./screens/Splash";
+
+/** Mounted globally (works logged-out too, like the real site) — hidden only
+ *  on the super-admin panel, mirroring the real web app's ChatWidget which
+ *  checks `pathname.startsWith("/super-admin")`. */
+function ChatWidgetGate() {
+  const location = useLocation();
+  if (location.pathname.startsWith("/sa")) return null;
+  return <ChatWidget />;
+}
 
 /** Welcome/Login/Signup are for logged-out visitors only — a returning user
  *  with a valid session should land straight on their dashboard, not see the
@@ -31,13 +41,11 @@ import Onboarding from "./screens/Onboarding";
 import Dashboard from "./screens/Dashboard";
 import TasksIndex from "./screens/tasks/TasksIndex";
 import TaskDetail from "./screens/tasks/TaskDetail";
-import NewTask from "./screens/tasks/NewTask";
 import TicketsIndex from "./screens/tickets/TicketsIndex";
 import TicketDetail from "./screens/tickets/TicketDetail";
 import SimulateInbound from "./screens/tickets/SimulateInbound";
 import Notifications from "./screens/Notifications";
 import Profile from "./screens/Profile";
-import Approvals from "./screens/Approvals";
 import Billing from "./screens/Billing";
 
 import Structure from "./screens/admin/Structure";
@@ -54,7 +62,6 @@ import SaCompanies from "./screens/sa/Companies";
 import SaCompanyDetail from "./screens/sa/CompanyDetail";
 import SaUserDetail from "./screens/sa/UserDetail";
 import SaPayments from "./screens/sa/Payments";
-import SaSubscriptions from "./screens/sa/Subscriptions";
 import SaAudit from "./screens/sa/Audit";
 import SaActivity from "./screens/sa/Activity";
 import SaChat from "./screens/sa/Chat";
@@ -92,14 +99,12 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/tasks" element={<TasksIndex />} />
-            <Route path="/tasks/new" element={<NewTask />} />
             <Route path="/tasks/:id" element={<TaskDetail />} />
             <Route path="/tickets" element={<TicketsIndex />} />
             <Route path="/tickets/simulate-inbound" element={<SimulateInbound />} />
             <Route path="/tickets/:id" element={<TicketDetail />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/approvals" element={<Approvals />} />
             <Route path="/billing" element={<Billing />} />
             <Route path="/admin/structure" element={<Structure />} />
             <Route path="/admin/roles" element={<Roles />} />
@@ -117,7 +122,6 @@ export default function App() {
             <Route path="/sa/companies/:id" element={<SaCompanyDetail />} />
             <Route path="/sa/users/:id" element={<SaUserDetail />} />
             <Route path="/sa/payments" element={<SaPayments />} />
-            <Route path="/sa/subscriptions" element={<SaSubscriptions />} />
             <Route path="/sa/audit" element={<SaAudit />} />
             <Route path="/sa/activity" element={<SaActivity />} />
             <Route path="/sa/chat" element={<SaChat />} />
@@ -127,6 +131,7 @@ export default function App() {
 
           <Route path="*" element={<RootRedirect />} />
         </Routes>
+        <ChatWidgetGate />
       </HashRouter>
     </ToastProvider>
   );

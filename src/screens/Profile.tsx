@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HelpCircle, Lock, LogOut, Save, Send, Trash2 } from "lucide-react";
+import { Building2, HelpCircle, Lock, LogOut, Mail, Save, Send, Shield, Trash2 } from "lucide-react";
 
 import { Screen, PageHeader } from "../components/ui/Screen";
 import { Text } from "../components/ui/Text";
@@ -16,24 +16,56 @@ import { useCurrentUser, useCompany } from "../lib/hooks";
 import { useDB, resetToSeed } from "../lib/db/store";
 import { changePassword, logout, updateProfile } from "../lib/services/auth";
 import { askSupport, myEscalations } from "../lib/services/support";
+import { fetchRealPlanStatus, RealPlanStatus } from "../lib/services/org";
+import { useSession } from "../lib/session";
 import { confirmAction } from "../lib/confirm";
 import { fullName, shortDate } from "../lib/util";
 import { colors } from "../lib/theme";
 import { cn } from "../lib/cn";
 
+/** Mirrors the real web app's Profile plan pill (components/views/profile-view.tsx):
+ *  Founding member (amber) > Unlimited (ink) > Free trial, N days left (amber, red under 3 days) > Free plan (outline). */
+function PlanBadge({ plan }: { plan: RealPlanStatus | null }) {
+  if (!plan) return null;
+  if (plan.isFounding) {
+    return (
+      <Badge label="Founding member" className="bg-amber text-[#202b4e]" textClassName="flex items-center gap-1 text-[#202b4e]" />
+    );
+  }
+  if (plan.effectiveTier === "paid") {
+    return <Badge label="Unlimited" className="bg-ink" textClassName="text-white" />;
+  }
+  if (plan.trialing) {
+    const urgent = (plan.trialDaysLeft ?? 99) <= 3;
+    const days = plan.trialDaysLeft ?? 0;
+    return (
+      <Badge
+        label={`Free trial · ${days} day${days === 1 ? "" : "s"} left`}
+        className={urgent ? "bg-destructive/15" : "bg-amber/20"}
+        textClassName={urgent ? "text-destructive" : "text-[#8a6d1f]"}
+      />
+    );
+  }
+  return <Badge label="Free plan" className="border border-hairline bg-transparent" />;
+}
+
 export default function Profile() {
   const me = useCurrentUser();
   const company = useCompany();
+  const { real } = useSession();
   const navigate = useNavigate();
   const toast = useToast();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<{ text: string; escalated: boolean } | null>(null);
+  const [plan, setPlan] = useState<RealPlanStatus | null>(null);
   const escTick = useDB((db) => db.supportEscalations.length);
   const myEsc = useMemo(() => (me ? myEscalations(me.id) : []), [me, escTick]);
 
@@ -50,26 +82,40 @@ export default function Profile() {
     }
   }, [me?.id]);
 
+  useEffect(() => {
+    if (!real) return;
+    fetchRealPlanStatus().then(setPlan);
+  }, [real]);
+
   if (!me) return null;
 
   const saveName = async () => {
+    if (!firstName.trim() || !lastName.trim()) return;
     try {
-      await updateProfile(me.id, { firstName, lastName });
-      toast.show("Profile updated", "success");
+      await updateProfile(me.id, { firstName: firstName.trim(), lastName: lastName.trim() });
+      setSavedMsg("Profile updated successfully.");
+      toast.show("Profile updated successfully.", "success");
+      setTimeout(() => setSavedMsg(null), 3000);
     } catch (e) {
-      toast.show(e instanceof Error ? e.message : "Failed", "error");
+      const msg = e instanceof Error ? e.message : "Failed to update profile.";
+      setSavedMsg(msg);
+      toast.show(msg, "error");
+      setTimeout(() => setSavedMsg(null), 3000);
     }
   };
 
   const savePassword = async () => {
     setPwError(null);
+    setPwSuccess(null);
     if (next !== confirm) return setPwError("New passwords do not match.");
     try {
       await changePassword(me.id, cur, next);
       setCur("");
       setNext("");
       setConfirm("");
-      toast.show("Password changed", "success");
+      setPwSuccess("Password changed successfully.");
+      toast.show("Password changed successfully.", "success");
+      setTimeout(() => setPwSuccess(null), 3000);
     } catch (e) {
       setPwError(e instanceof Error ? e.message : "Failed to change password.");
     }
@@ -89,39 +135,89 @@ export default function Profile() {
 
   return (
     <Screen maxWidth={840}>
-      <PageHeader title="Profile" subtitle="Manage your account." />
+      <PageHeader title="Profile" subtitle="Manage your account information." />
 
-      <Card className="flex flex-row items-center gap-3 p-4">
-        <Avatar name={fullName(me)} size="lg" tone="primary" />
+      <Card className="flex flex-row items-center gap-4 p-6">
+        <div className="rounded-full ring-2 ring-hairline">
+          <Avatar name={fullName(me)} size="xl" tone="muted" />
+        </div>
         <div className="flex-1">
-          <Text variant="heading">{fullName(me)}</Text>
-          <Text variant="caption">{me.email}</Text>
-          <div className="mt-1.5 flex flex-row flex-wrap gap-1.5">
-            {role ? <Badge label={role} /> : null}
-            {unit ? <Badge label={unit} /> : null}
-            {me.isCompanyAdmin ? <Badge label="Admin" className="bg-ink" textClassName="text-white" /> : null}
+          <Text variant="heading" className="text-[16px]">
+            {fullName(me)}
+          </Text>
+          <div className="mt-1.5 flex flex-row flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1">
+              <Mail size={11} color={colors.mutedForeground} />
+              <Badge label={me.email} />
+            </span>
+            {role ? (
+              <span className="inline-flex items-center gap-1">
+                <Shield size={11} color={colors.mutedForeground} />
+                <Badge label={role} />
+              </span>
+            ) : null}
+            {unit ? (
+              <span className="inline-flex items-center gap-1">
+                <Building2 size={11} color={colors.mutedForeground} />
+                <Badge label={unit} />
+              </span>
+            ) : null}
+            <PlanBadge plan={plan} />
           </div>
         </div>
       </Card>
 
       <Card className="flex flex-col gap-3 p-4">
-        <Text variant="heading">Personal information</Text>
+        <Text variant="heading">Personal Information</Text>
         <div className="flex flex-row gap-3">
-          <Input containerClassName="flex-1" label="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          <Input containerClassName="flex-1" label="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          <Input containerClassName="flex-1" label="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          <Input containerClassName="flex-1" label="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
         </div>
-        <Input label="Email" value={me.email} disabled />
-        <Button title="Save changes" size="sm" icon={<Save size={14} color={colors.white} />} onPress={saveName} />
+        <Input label="Email" value={me.email} disabled hint="Email cannot be changed." />
+        {savedMsg ? (
+          <Text variant="caption" tone={savedMsg.includes("successfully") ? undefined : "danger"} className={savedMsg.includes("successfully") ? "font-medium text-teal" : undefined}>
+            {savedMsg}
+          </Text>
+        ) : null}
+        <Button title="Save Changes" size="sm" icon={<Save size={14} color={colors.white} />} onPress={saveName} disabled={!firstName.trim() || !lastName.trim()} />
       </Card>
 
       <Card className="flex flex-col gap-3 p-4">
-        <Text variant="heading">Change password</Text>
+        <div className="flex flex-row items-center gap-1.5">
+          <Lock size={15} color={colors.ink} />
+          <Text variant="heading">Change Password</Text>
+        </div>
         {pwError ? <Banner tone="error">{pwError}</Banner> : null}
-        <Input label="Current password" value={cur} onChange={(e) => setCur(e.target.value)} secure icon={<Lock size={15} color={colors.mutedForeground} />} />
-        <Input label="New password" value={next} onChange={(e) => setNext(e.target.value)} secure hint="Min 8 chars, 1 uppercase, 1 number, 1 special." icon={<Lock size={15} color={colors.mutedForeground} />} />
-        <Input label="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} secure icon={<Lock size={15} color={colors.mutedForeground} />} />
-        <Button title="Change password" size="sm" variant="outline" onPress={savePassword} disabled={!cur || !next || !confirm} />
+        <Input label="Current Password" value={cur} onChange={(e) => setCur(e.target.value)} secure icon={<Lock size={15} color={colors.mutedForeground} />} />
+        <Input
+          label="New Password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          secure
+          hint="Min 8 chars, 1 uppercase, 1 number, 1 special character."
+          icon={<Lock size={15} color={colors.mutedForeground} />}
+        />
+        <Input label="Confirm New Password" value={confirm} onChange={(e) => setConfirm(e.target.value)} secure icon={<Lock size={15} color={colors.mutedForeground} />} />
+        {pwSuccess ? (
+          <Text variant="caption" className="font-medium text-teal">
+            {pwSuccess}
+          </Text>
+        ) : null}
+        <Button title="Change Password" size="sm" icon={<Lock size={14} color={colors.white} />} onPress={savePassword} disabled={!cur || !next || !confirm} />
       </Card>
+
+      <div className="flex flex-col gap-2">
+        <Text variant="heading" className="px-1">
+          Account Information
+        </Text>
+        <KeyValueList>
+          <KeyValueRow label="Department" value={unit ?? "—"} />
+          <KeyValueRow label="Role" value={role ?? "—"} />
+          <KeyValueRow label="Account Created" value={shortDate(me.createdAt)} />
+          <KeyValueRow label="Status" value={<Badge label={me.status === "active" ? "Active" : "Inactive"} className={me.status === "active" ? "bg-ink" : "bg-muted"} textClassName={me.status === "active" ? "text-white" : undefined} />} />
+          <KeyValueRow label="Email Verified" value={<Badge label={me.isEmailVerified ? "Verified" : "Not Verified"} className={me.isEmailVerified ? "bg-ink" : undefined} textClassName={me.isEmailVerified ? "text-white" : undefined} />} last />
+        </KeyValueList>
+      </div>
 
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex flex-row items-center gap-1.5">
@@ -158,21 +254,20 @@ export default function Profile() {
         ) : null}
       </Card>
 
-      <KeyValueList>
-        <KeyValueRow label="Organization" value={company?.name ?? "—"} />
-        <KeyValueRow label="Plan" value={company?.subscriptionTier === "paid" ? "Paid" : "Free"} />
-        <KeyValueRow label="Account created" value={shortDate(me.createdAt)} />
-        <KeyValueRow label="Email verified" value={me.isEmailVerified ? "Verified" : "Not verified"} last />
-      </KeyValueList>
-
-      <Button title="Sign out" variant="outline" icon={<LogOut size={15} color={colors.ink} />} onPress={doLogout} fullWidth />
-      <Button
-        title="Reset demo data"
-        variant="ghost"
-        icon={<Trash2 size={15} color={colors.destructive} />}
-        onPress={() => confirmAction("Reset demo data?", "This wipes local data and restores the seed. You'll be signed out.", doReset, "Reset", true)}
-        fullWidth
-      />
+      <div className="flex flex-row items-center justify-between gap-2 pt-1">
+        {!real ? (
+          <Button
+            title="Reset demo data"
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 size={14} color={colors.destructive} />}
+            onPress={() => confirmAction("Reset demo data?", "This wipes local data and restores the seed. You'll be signed out.", doReset, "Reset", true)}
+          />
+        ) : (
+          <span />
+        )}
+        <Button title="Sign out" variant="outline" size="sm" icon={<LogOut size={14} color={colors.ink} />} onPress={doLogout} />
+      </div>
     </Screen>
   );
 }

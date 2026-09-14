@@ -1,17 +1,15 @@
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Ban, Play, Snowflake, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Snowflake, Sun, Trash2 } from "lucide-react";
 
 import { Screen } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
-import { Button } from "../../components/ui/Button";
 import { Loading } from "../../components/ui/Feedback";
 import { useToast } from "../../components/ui/Toast";
 import { useDB } from "../../lib/db/store";
 import { companyDetail, deleteCompany, setCompanyStatus } from "../../lib/services/superAdmin";
 import { confirmAction } from "../../lib/confirm";
 import { shortDate } from "../../lib/util";
-import { colors } from "../../lib/theme";
 
 const STATUS_BADGE: Record<string, string> = {
   active: "bg-teal/15 text-teal",
@@ -43,14 +41,26 @@ export default function SaCompanyDetail() {
       <Loading />
     </Screen>
   );
-  const { company, subscription, members, units, tasks, tickets, payments, audit } = data;
-  const openTasks = tasks; // local model doesn't split open vs. total; shown as one figure
+  const { company, subscription, members, units, roles, tasks, openTasks, payments, audit } = data;
 
-  const setStatus = (s: "active" | "frozen" | "suspended") =>
-    confirmAction(`Set ${company.name} to ${s}?`, s === "active" ? "Users regain access." : "This blocks all authenticated access.", () => {
+  const setStatus = (s: "active" | "frozen" | "suspended", label: string) =>
+    confirmAction(`${label} ${company.name}?`, `This ${s === "active" ? "restores" : "cuts"} all access for its users.`, () => {
       setCompanyStatus(id, s);
       toast.show(`Company ${s}`, "success");
     });
+
+  const remove = () => {
+    const confirmName = window.prompt(
+      `PERMANENT DELETE. This wipes the company and every user, org unit, task and record under it.\n\nType the company name to confirm:\n${company.name}`,
+    );
+    if (confirmName !== company.name) {
+      if (confirmName !== null) window.alert("Name did not match. Nothing deleted.");
+      return;
+    }
+    deleteCompany(id);
+    toast.show("Company deleted", "success");
+    navigate("/sa/companies", { replace: true });
+  };
 
   return (
     <Screen>
@@ -69,33 +79,39 @@ export default function SaCompanyDetail() {
           </Text>
         </div>
         <div className="flex flex-row flex-wrap gap-2">
-          {company.status !== "active" ? (
-            <Button title="Reactivate" size="sm" icon={<Play size={13} color={colors.white} />} onPress={() => setStatus("active")} />
-          ) : (
+          {company.status === "active" ? (
             <>
-              <Button title="Freeze" size="sm" variant="outline" icon={<Snowflake size={13} color={colors.ink} />} onPress={() => setStatus("frozen")} />
-              <Button title="Suspend" size="sm" variant="outline" icon={<Ban size={13} color={colors.ink} />} onPress={() => setStatus("suspended")} />
+              <button
+                type="button"
+                onClick={() => setStatus("frozen", "Freeze")}
+                className="flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+              >
+                <Snowflake size={15} color="#fff" /> Freeze
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus("suspended", "Suspend")}
+                className="flex items-center gap-1.5 rounded-lg bg-[#ea580c] px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+              >
+                <Ban size={15} color="#fff" /> Suspend
+              </button>
             </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setStatus("active", "Reactivate")}
+              className="flex items-center gap-1.5 rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+            >
+              <Sun size={15} color="#fff" /> Reactivate
+            </button>
           )}
-          <Button
-            title="Delete"
-            size="sm"
-            variant="destructive"
-            icon={<Trash2 size={13} color={colors.white} />}
-            onPress={() =>
-              confirmAction(
-                "Delete this company?",
-                "Permanently removes the tenant and all its data.",
-                () => {
-                  deleteCompany(id);
-                  toast.show("Company deleted", "success");
-                  navigate("/sa/companies", { replace: true });
-                },
-                "Delete",
-                true,
-              )
-            }
-          />
+          <button
+            type="button"
+            onClick={remove}
+            className="flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive/10"
+          >
+            <Trash2 size={15} /> Delete
+          </button>
         </div>
       </div>
 
@@ -103,9 +119,9 @@ export default function SaCompanyDetail() {
         {[
           ["Users", members.length],
           ["Org units", units],
+          ["Roles", roles],
           ["Tasks", tasks],
           ["Open tasks", openTasks],
-          ["Tickets", tickets],
         ].map(([label, val]) => (
           <div key={label as string} className="rounded-xl border border-hairline bg-card p-3">
             <Text variant="caption">{label}</Text>
@@ -117,8 +133,28 @@ export default function SaCompanyDetail() {
       <section className="rounded-xl border border-hairline bg-card">
         <header className="flex flex-row flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
           <Text variant="heading">Billing</Text>
-          <Text variant="caption">{subscription ? `${subscription.tier} · ${subscription.status}` : "—"}</Text>
+          <button type="button" onClick={() => navigate(`/sa/payments`)} className="text-xs text-teal hover:underline">
+            All payments
+          </button>
         </header>
+        <div className="grid gap-3 p-4 sm:grid-cols-4">
+          <div>
+            <Text variant="caption">Plan</Text>
+            <p className="text-sm font-medium capitalize text-ink">{subscription?.tier ?? company.subscriptionTier}</p>
+          </div>
+          <div>
+            <Text variant="caption">Billing status</Text>
+            <p className="text-sm font-medium capitalize text-ink">{subscription?.status.replace("_", " ") ?? "—"}</p>
+          </div>
+          <div>
+            <Text variant="caption">Current period ends</Text>
+            <p className="text-sm font-medium text-ink">{subscription?.currentPeriodEnd ? shortDate(subscription.currentPeriodEnd) : "—"}</p>
+          </div>
+          <div>
+            <Text variant="caption">Grace ends</Text>
+            <p className="text-sm font-medium text-ink">{subscription?.graceEndsAt ? shortDate(subscription.graceEndsAt) : "—"}</p>
+          </div>
+        </div>
         {payments.length === 0 ? (
           <Text variant="caption" className="block px-4 py-4">
             No payments recorded.
@@ -133,8 +169,15 @@ export default function SaCompanyDetail() {
                     {p.currency} {(p.amount / 100).toLocaleString()}
                   </td>
                   <td className="px-3 py-2 capitalize text-muted-foreground">{p.provider}</td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">{p.invoiceNumber || "—"}</td>
                   <td className="px-4 py-2 text-right">
-                    <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold capitalize ${p.status === "success" ? "bg-teal/15 text-teal" : "bg-amber/20 text-[#8a5a12]"}`}>{p.status}</span>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[11px] font-semibold capitalize ${
+                        p.status === "success" ? "bg-teal/15 text-teal" : p.status === "failed" ? "bg-destructive/15 text-destructive" : "bg-amber/20 text-[#8a5a12]"
+                      }`}
+                    >
+                      {p.status === "success" ? "valid" : p.status}
+                    </span>
                   </td>
                 </tr>
               ))}

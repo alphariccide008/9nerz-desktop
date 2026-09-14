@@ -1,51 +1,52 @@
-import { useMemo, useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Flag } from "lucide-react";
 
 import { Screen, PageHeader } from "../../components/ui/Screen";
-import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
-import { Select } from "../../components/ui/Select";
-import { EmptyState } from "../../components/ui/Feedback";
 import { AdminGuard } from "../../components/admin/AdminGuard";
 import { useCurrentUser } from "../../lib/hooks";
 import { useDB } from "../../lib/db/store";
-import { auditActionTypes, listAudit } from "../../lib/services/audit";
-import { relativeTime } from "../../lib/util";
-import { colors } from "../../lib/theme";
+import { AuditView, fetchRealAudit, listAudit } from "../../lib/services/audit";
+import { useSession } from "../../lib/session";
 
 export default function Audit() {
   const me = useCurrentUser();
-  const [filter, setFilter] = useState<string | null>(null);
+  const { real } = useSession();
   const tick = useDB((db) => db.auditLogs.length);
-  const types = useMemo(() => (me ? auditActionTypes(me.companyId) : []), [me, tick]);
-  const rows = useMemo(() => (me ? listAudit(me.companyId, filter ? { actionType: filter } : undefined) : []), [me, tick, filter]);
+  const mockRows = useMemo(() => (me ? listAudit(me.companyId) : []), [me, tick]);
+  const [realRows, setRealRows] = useState<AuditView[] | null>(null);
+
+  useEffect(() => {
+    if (!real) return;
+    fetchRealAudit().then(setRealRows);
+  }, [real?.user.id]);
+
+  const rows = real ? (realRows ?? []) : mockRows;
 
   if (!me) return null;
 
   return (
     <AdminGuard>
       <Screen>
-        <PageHeader title="Audit trail" subtitle="Every state-changing action in your workspace." />
-        <Select label="Filter by action" value={filter} options={types.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))} onChange={setFilter} allowClear placeholder="All actions" />
-        {rows.length === 0 ? (
-          <EmptyState icon={<ShieldCheck size={22} color={colors.slate} />} title="Nothing logged yet" />
-        ) : (
-          <Card>
-            {rows.map((r, i) => (
-              <div key={r.id} className={`flex flex-row items-center gap-3 px-4 py-2.5 ${i > 0 ? "border-t border-hairline/60" : ""}`}>
-                <span className={`h-2 w-2 rounded-full ${r.isFlagged ? "bg-destructive" : "bg-hairline"}`} />
-                <div className="flex-1">
-                  <div className="text-[13px] capitalize text-ink">{r.actionType.replace(/_/g, " ")}</div>
-                  <Text variant="caption">
-                    {r.actorName}
-                    {r.entityType ? ` · ${r.entityType}` : ""}
-                  </Text>
-                </div>
-                <Text variant="caption">{relativeTime(r.createdAt)}</Text>
-              </div>
-            ))}
-          </Card>
-        )}
+        <PageHeader title="Audit trail" subtitle="Every structural change in your organization." />
+        <div className="overflow-hidden rounded-xl border border-hairline bg-card">
+          {rows.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">Nothing logged yet.</p>
+          ) : (
+            <ul className="divide-y divide-hairline">
+              {rows.map((r) => (
+                <li key={r.id} className="flex flex-col gap-0.5 px-4 py-2.5 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2">
+                  <span className="flex min-w-0 items-center gap-2">
+                    {r.isFlagged ? <Flag className="h-3.5 w-3.5 shrink-0 text-red-500" /> : null}
+                    <span className="min-w-0 truncate font-medium text-ink">{r.actionType.replace(/_/g, " ")}</span>
+                    {r.entityType ? <span className="shrink-0 text-xs text-muted-foreground">· {r.entityType}</span> : null}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">by {r.actorName}</span>
+                  <span className="text-[11px] text-muted-foreground sm:ml-auto sm:shrink-0">{new Date(r.createdAt).toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </Screen>
     </AdminGuard>
   );

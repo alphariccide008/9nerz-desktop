@@ -8,6 +8,63 @@ import { getDB, mutate } from "../db/store";
 import { FOUNDING_RATE_SLOTS, FREE_LIMITS, PLANS, Payment, PaymentProvider, PlanId, Subscription } from "../db/schema";
 import { uid, nowISO } from "../util";
 import { ServiceError, writeAudit, userById, recomputeUnitLocks } from "./helpers";
+import { apiRequest } from "../api/http";
+import { getSession, getAccessToken } from "../session";
+
+/** Exact shape of GET /api/billing — read directly rather than reimplemented,
+ *  since plan limits/pricing/founding-rate math are server-computed and must
+ *  match the web app's numbers exactly, not an approximated local copy. */
+export interface RealBillingPlan {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  interval: string;
+  limits: Record<string, number>;
+  features: string[];
+}
+export interface RealBillingData {
+  company: { id: string; name: string; status: string; billingEmail: string | null };
+  plans: { free: RealBillingPlan; paid: RealBillingPlan };
+  subscription: { plan: string; billing_status: string; current_period_end: string | null; next_payment_due: string | null; grace_until: string | null } | null;
+  paymentMethods: { id: string; provider: string; brand: string | null; last4: string | null; exp_month: number | null; exp_year: number | null; bank: string | null; is_default: boolean }[];
+  payments: { id: string; amount: number; currency: string; provider: string; status: string; method: string | null; invoice_number: string | null; paid_at: string | null; period_end: string | null; created_at: string }[];
+  usage: { businessUnits: number; departments: number; staff: number };
+  providerReady: boolean;
+  isFounding: boolean;
+  trial: { active: boolean; endsAt: string | null; daysLeft: number };
+  effectiveTier: "free" | "paid";
+  founding: { cap: number; claimed: number; remaining: number; eligible: boolean; alreadyFounding: boolean; price: number; currency: string; interval: string };
+}
+
+/** The billing routes still run the web app's older cookie-session auth (a
+ *  plaintext `nerz_session=<email>` cookie set at web login) rather than the
+ *  Bearer-JWT auth every other route accepts — desktop never has that cookie
+ *  since it never goes through a browser login, so it's built and sent
+ *  explicitly here. Not a security bypass: it asserts the same identity the
+ *  Bearer token already proves, just in the shape this one route family
+ *  still expects pending its own migration to the JWT auth. */
+function sessionCookie(): string | null {
+  const real = getSession().real;
+  return real ? `nerz_session=${encodeURIComponent(real.user.email)}` : null;
+}
+
+export async function fetchRealBilling(): Promise<RealBillingData | null> {
+  if (!getSession().real) return null;
+  try {
+    return await apiRequest<RealBillingData>("GET", "/api/billing", undefined, getAccessToken(), sessionCookie());
+  } catch {
+    return null;
+  }
+}
+
+export async function removeRealPaymentMethod(methodId: string): Promise<void> {
+  await apiRequest("DELETE", `/api/billing/payment-methods/${methodId}`, undefined, getAccessToken(), sessionCookie());
+}
+
+export async function startRealCheckout(): Promise<{ authorizationUrl?: string; message?: string; provider?: string }> {
+  return apiRequest("POST", "/api/billing/checkout", {}, getAccessToken(), sessionCookie());
+}
 
 const TRIAL_DAYS = 14;
 

@@ -2,14 +2,17 @@ import { ButtonHTMLAttributes, HTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-xl border border-hairline bg-card", className)} {...props} />;
+  return <div className={cn("rounded-xl border border-hairline bg-card shadow-sm", className)} {...props} />;
 }
 
 export function PressableCard({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       type="button"
-      className={cn("rounded-xl border border-hairline bg-card text-left hover:bg-muted/60 transition-colors", className)}
+      className={cn(
+        "rounded-xl border border-hairline bg-card text-left shadow-sm transition-all duration-200 ease-out hover:bg-muted/60 hover:shadow-md",
+        className,
+      )}
       {...props}
     />
   );

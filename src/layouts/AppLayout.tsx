@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { SidebarContent } from "../components/shell/Sidebar";
+import { NotificationBell } from "../components/shell/NotificationBell";
 import { useCurrentUser, useUnreadCount } from "../lib/hooks";
 import { useSession } from "../lib/session";
 import { onboardingStatus } from "../lib/services/org";
@@ -9,6 +10,7 @@ import { syncRealOrgData } from "../lib/services/orgSync";
 import { syncRealMailbox } from "../lib/services/mailbox";
 import { syncRealTasks } from "../lib/services/taskSync";
 import { syncRealTickets } from "../lib/services/ticketSync";
+import { syncRealNotifications } from "../lib/services/notifications";
 import { updateTaskbarBadge } from "../lib/badge";
 
 const SIDEBAR_W = 248;
@@ -62,9 +64,11 @@ export default function AppLayout() {
     if (!real) return;
     syncRealTasks();
     syncRealTickets();
+    syncRealNotifications();
     const t = setInterval(() => {
       syncRealTasks();
       syncRealTickets();
+      syncRealNotifications();
     }, 20_000);
     return () => clearInterval(t);
   }, [real?.user.id]);
@@ -76,8 +80,13 @@ export default function AppLayout() {
       <div style={{ width: SIDEBAR_W }} className="shrink-0 border-r border-hairline">
         <SidebarContent />
       </div>
-      <div className="min-w-0 flex-1">
-        <Outlet />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-14 shrink-0 items-center justify-end border-b border-hairline bg-card px-4">
+          <NotificationBell />
+        </div>
+        <div className="min-h-0 flex-1">
+          <Outlet />
+        </div>
       </div>
     </div>
   );

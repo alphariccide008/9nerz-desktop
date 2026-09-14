@@ -34,7 +34,7 @@ export function PageHeader({
   right,
   onRefresh,
 }: {
-  title: string;
+  title: ReactNode;
   subtitle?: string;
   right?: ReactNode;
   onRefresh?: () => void;
@@ -42,7 +42,9 @@ export function PageHeader({
   return (
     <div className="flex flex-row items-start justify-between gap-3">
       <div className="flex-1">
-        <Text variant="title">{title}</Text>
+        <Text variant="title" className="flex items-center gap-2">
+          {title}
+        </Text>
         {subtitle ? (
           <Text variant="caption" className="mt-0.5 block">
             {subtitle}

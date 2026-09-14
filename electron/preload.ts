@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld("nerz", {
   appVersion: () => ipcRenderer.invoke("nerz:appVersion"),
   setBadge: (dataUrl: string | null, description?: string) => ipcRenderer.invoke("nerz:setBadge", dataUrl, description),
   api: {
-    request: (method: string, path: string, body?: unknown, token?: string | null) =>
-      ipcRenderer.invoke("nerz:api", { method, path, body, token }),
+    request: (method: string, path: string, body?: unknown, token?: string | null, cookie?: string | null) =>
+      ipcRenderer.invoke("nerz:api", { method, path, body, token, cookie }),
   },
 });

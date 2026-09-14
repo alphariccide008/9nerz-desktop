@@ -6,18 +6,24 @@ import { cn } from "../../lib/cn";
 type Variant = "primary" | "amber" | "outline" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
 
-const base = "inline-flex flex-row items-center justify-center rounded-xl transition-opacity cursor-pointer disabled:cursor-not-allowed";
+// `self-start` stops a button from silently stretching to fill its container's
+// width — the common `<Card className="flex flex-col gap-3">` pattern used all
+// over the app defaults to `align-items: stretch`, which otherwise forces every
+// direct-child button to full width even though it's `inline-flex` internally.
+// `fullWidth` still works: an explicit `w-full` overrides self-alignment sizing.
+const base =
+  "inline-flex flex-row items-center justify-center self-start rounded-md transition-all duration-200 ease-out cursor-pointer disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100";
 const sizes: Record<Size, string> = {
-  sm: "h-9 px-3 gap-1.5",
-  md: "h-11 px-4 gap-2",
-  lg: "h-12 px-5 gap-2",
+  sm: "h-8 px-3 gap-1.5",
+  md: "h-9 px-4 gap-2",
+  lg: "h-10 px-5 gap-2",
 };
 const variants: Record<Variant, string> = {
-  primary: "bg-ink hover:opacity-90",
-  amber: "bg-amber hover:opacity-90",
-  outline: "border border-hairline bg-card hover:bg-muted",
+  primary: "bg-ink shadow-sm hover:bg-ink/90 hover:shadow-md",
+  amber: "bg-amber shadow-sm hover:brightness-105 hover:shadow-md",
+  outline: "border border-hairline bg-card shadow-sm hover:bg-muted hover:shadow-md",
   ghost: "bg-transparent hover:bg-muted",
-  destructive: "bg-destructive hover:opacity-90",
+  destructive: "bg-destructive shadow-sm hover:bg-destructive/90 hover:shadow-md",
 };
 const labelTone: Record<Variant, "inverse" | "primary"> = {
   primary: "inverse",

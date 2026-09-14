@@ -7,7 +7,6 @@ import { Text } from "../../components/ui/Text";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
-import { StatusPill, PriorityBadge } from "../../components/ui/Badge";
 import { Banner, Loading } from "../../components/ui/Feedback";
 import { Linkified } from "../../components/ui/Linkified";
 import { useToast } from "../../components/ui/Toast";
@@ -30,6 +29,7 @@ const NEXT: Record<string, [TicketStatus, string][]> = {
 };
 
 const PRIORITIES = ["Low", "Normal", "High", "Critical"] as const;
+const PRIORITY_DOT: Record<string, string> = { Low: "#cbd5e1", Normal: "#38bdf8", High: "#f59e0b", Critical: "#ef4444" };
 const MAX_ATTACHMENTS = 5;
 const MAX_BYTES = 25 * 1024 * 1024;
 
@@ -138,8 +138,11 @@ export function TicketDetailContent({ ticketId: id, onClose }: { ticketId: strin
         <div className="flex flex-row flex-wrap items-center gap-2">
           {ticket.ref ? <span className="rounded bg-ink/[0.06] px-1.5 py-0.5 font-mono text-[11px] font-semibold text-ink">{ticket.ref}</span> : null}
           <h1 className="min-w-0 break-words font-display text-lg font-bold text-ink">{ticket.subject}</h1>
-          <StatusPill status={ticket.status} />
-          <PriorityBadge priority={ticket.priority} />
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold capitalize text-muted-foreground">{ticket.status.replace("_", " ")}</span>
+          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: PRIORITY_DOT[ticket.priority] ?? "#cbd5e1" }} />
+            {ticket.priority}
+          </span>
         </div>
         <Text variant="caption" className="mt-1 block">
           {ticket.requesterName || ticket.requesterEmail}

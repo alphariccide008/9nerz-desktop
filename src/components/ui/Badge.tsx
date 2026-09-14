@@ -11,9 +11,17 @@ export function Badge({
   className?: string;
   textClassName?: string;
 }) {
+  // `cn` is a plain joiner, not a tailwind-merge — a caller-supplied `bg-*`/
+  // `text-*` override doesn't replace these defaults, it just sits alongside
+  // them, so both classes leak into the final markup and whichever Tailwind
+  // happens to generate later in the stylesheet wins the cascade (usually the
+  // default). Suppress the matching default explicitly instead of relying on
+  // source order.
+  const hasCustomBg = /\bbg-/.test(className ?? "");
+  const hasCustomText = /\btext-/.test(textClassName ?? "");
   return (
-    <div className={cn("inline-block self-start rounded-md bg-muted px-1.5 py-0.5", className)}>
-      <Text variant="caption" className={cn("font-semibold text-slate", textClassName)}>
+    <div className={cn("inline-block self-start rounded-md px-2 py-0.5", !hasCustomBg && "bg-muted", className)}>
+      <Text variant="caption" className={cn("font-semibold", !hasCustomText && "text-slate", textClassName)}>
         {label}
       </Text>
     </div>

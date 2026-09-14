@@ -1,22 +1,55 @@
 import { ReactNode, useMemo, useState } from "react";
-import { AlertTriangle, Flag, Inbox, LifeBuoy, RefreshCcw, ShieldAlert, type LucideIcon } from "lucide-react";
+import { Activity, AlertTriangle, CreditCard, Flag, Inbox, LifeBuoy, RefreshCw, type LucideIcon } from "lucide-react";
 
-import { Screen, PageHeader } from "../../components/ui/Screen";
+import { Screen } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
-import { Banner } from "../../components/ui/Feedback";
 import { useToast } from "../../components/ui/Toast";
 import { useDB } from "../../lib/db/store";
-import { operationsHealth, runBillingSweep } from "../../lib/services/superAdmin";
+import {
+  dismissAuditFlag,
+  listSupportEscalations,
+  operationsHealth,
+  resolveSupportEscalation,
+  runBillingSweep,
+} from "../../lib/services/superAdmin";
 import { relativeTime } from "../../lib/util";
-import { colors } from "../../lib/theme";
+
+const empty = <p className="text-xs text-muted-foreground">Nothing needs attention here.</p>;
+
+function Card({
+  title,
+  icon: Icon,
+  count,
+  children,
+}: {
+  title: string;
+  icon: LucideIcon;
+  count: number;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-hairline bg-card">
+      <header className="flex items-center gap-2 border-b border-hairline px-4 py-3 text-sm font-semibold text-ink">
+        <Icon className="h-4 w-4" />
+        {title}
+        <span className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold ${count > 0 ? "bg-amber/20 text-[#8a5a12]" : "bg-teal/15 text-teal"}`}>
+          {count}
+        </span>
+      </header>
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
 
 export default function SaOperations() {
   const toast = useToast();
-  const tick = useDB((db) => db.subscriptions.length + db.tickets.length + db.attachments.length + db.auditLogs.length + db.supportEscalations.length + db.platformTickets.length);
+  const tick = useDB(
+    (db) => db.subscriptions.length + db.tickets.length + db.attachments.length + db.auditLogs.length + db.supportEscalations.length + db.platformTickets.length,
+  );
   const health = useMemo(() => operationsHealth(), [tick]);
+  const escalations = useMemo(() => listSupportEscalations("open"), [tick]);
   const [sweeping, setSweeping] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
 
   const sweep = () => {
     setSweeping(true);
@@ -30,108 +63,120 @@ export default function SaOperations() {
     }
   };
 
-  const allHealthy =
-    health.billingRisk.length === 0 &&
-    health.unroutedPileups.length === 0 &&
-    health.stuckAttachmentScans === 0 &&
-    health.flaggedAuditEntries.length === 0 &&
-    health.openSupportEscalations === 0 &&
-    health.openPlatformTickets === 0;
+  const act = (key: string, fn: () => void) => {
+    setBusy(key);
+    try {
+      fn();
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <Screen>
-      <PageHeader
-        title="Operations"
-        subtitle="Platform health signals — no cron here, so this reflects the last time each check ran."
-        right={<Button title="Run billing sweep" size="sm" variant="outline" icon={<RefreshCcw size={13} color={colors.ink} />} loading={sweeping} onPress={sweep} />}
-      />
-
-      {allHealthy ? <Banner tone="success">Nothing needs attention right now.</Banner> : null}
-
-      <div className="flex flex-row flex-wrap gap-2.5">
-        <MiniStat label="Billing risk" value={health.billingRisk.length} danger={health.billingRisk.length > 0} />
-        <MiniStat label="Unrouted pileups" value={health.unroutedPileups.reduce((n, u) => n + u.count, 0)} danger={health.unroutedPileups.length > 0} />
-        <MiniStat label="Stuck scans" value={health.stuckAttachmentScans} danger={health.stuckAttachmentScans > 0} />
-        <MiniStat label="Flagged entries" value={health.flaggedAuditEntries.length} danger={health.flaggedAuditEntries.length > 0} />
-        <MiniStat label="Open escalations" value={health.openSupportEscalations} danger={health.openSupportEscalations > 0} />
-        <MiniStat label="Open mailbox" value={health.openPlatformTickets} danger={health.openPlatformTickets > 0} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 font-display text-lg font-bold text-ink">
+            <Activity className="h-5 w-5" /> Operations
+          </h1>
+          <Text variant="caption" className="mt-0.5 block max-w-xl">
+            Platform-wide health. Widespread failure across every company usually means an infra / provider issue, not individual accounts.
+          </Text>
+        </div>
+        <button
+          type="button"
+          onClick={sweep}
+          disabled={sweeping}
+          className="flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-2 text-sm font-medium text-ink transition hover:border-ink disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${sweeping ? "animate-spin" : ""}`} />
+          Run billing sweep
+        </button>
       </div>
 
-      {health.billingRisk.length > 0 ? (
-        <Section icon={AlertTriangle} title="Billing risk">
-          {health.billingRisk.map((b, i) => (
-            <Row key={`${b.companyId}-${i}`} left={b.companyName} right={b.status} first={i === 0} />
-          ))}
-        </Section>
-      ) : null}
+      <Card title="Support escalations" icon={LifeBuoy} count={escalations.length}>
+        {escalations.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No open escalations. The assistant is handling the generic questions.</p>
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {escalations.map((e) => (
+              <li key={e.id} className="py-2.5 text-sm">
+                <p className="text-ink">{e.question}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <span>{e.companyName ?? "—"}</span>
+                  {e.requesterName && <span>· {e.requesterName}</span>}
+                  <span>· {relativeTime(e.createdAt)}</span>
+                  <button
+                    type="button"
+                    onClick={() => act(`esc-${e.id}`, () => resolveSupportEscalation(e.id))}
+                    disabled={busy === `esc-${e.id}`}
+                    className="ml-auto rounded-lg border border-hairline px-2 py-1 font-medium text-ink hover:border-ink disabled:opacity-40"
+                  >
+                    Mark resolved
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
-      {health.unroutedPileups.length > 0 ? (
-        <Section icon={Inbox} title="Unrouted ticket pileups">
-          {health.unroutedPileups.map((u, i) => (
-            <Row key={u.companyId} left={u.companyName} right={`${u.count} unrouted`} first={i === 0} />
-          ))}
-        </Section>
-      ) : null}
+      <Card title="Billing risk" icon={CreditCard} count={health.billingRisk.length}>
+        {health.billingRisk.length === 0
+          ? empty
+          : (
+            <ul className="divide-y divide-hairline">
+              {health.billingRisk.map((b, i) => (
+                <li key={`${b.companyId}-${i}`} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                  <span className="font-medium text-ink">{b.companyName}</span>
+                  <span className="rounded bg-amber/20 px-1.5 py-0.5 text-[11px] font-semibold capitalize text-[#8a5a12]">
+                    {b.status.replace("_", " ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+      </Card>
 
-      {health.flaggedAuditEntries.length > 0 ? (
-        <Section icon={Flag} title="Flagged audit entries">
-          {health.flaggedAuditEntries.map((f, i) => (
-            <Row key={f.id} left={`${f.companyName} · ${f.actionType.replace(/_/g, " ")}`} right={relativeTime(f.createdAt)} first={i === 0} />
-          ))}
-        </Section>
-      ) : null}
+      <Card title="Attachments stuck in scan" icon={AlertTriangle} count={health.stuckAttachmentScans}>
+        {health.stuckAttachmentScans === 0 ? empty : (
+          <p className="text-xs text-ink">{health.stuckAttachmentScans} attachment{health.stuckAttachmentScans === 1 ? "" : "s"} pending scan for over 24h.</p>
+        )}
+      </Card>
 
-      {health.lastEscalationRun.length > 0 ? (
-        <Section icon={ShieldAlert} title="Last SLA escalation, per company">
-          {health.lastEscalationRun.map((l, i) => (
-            <Row key={l.companyId} left={l.companyName} right={relativeTime(l.at)} first={i === 0} />
-          ))}
-        </Section>
-      ) : null}
+      <Card title="Unrouted ticket pile-ups" icon={Inbox} count={health.unroutedPileups.length}>
+        {health.unroutedPileups.length === 0 ? empty : (
+          <ul className="divide-y divide-hairline">
+            {health.unroutedPileups.map((u) => (
+              <li key={u.companyId} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 py-2 text-sm">
+                <span className="min-w-0 truncate font-medium text-ink">{u.companyName}</span>
+                <span className="text-[11px] text-muted-foreground sm:ml-auto">{u.count} open unrouted, no routing rules?</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
-      {health.openSupportEscalations > 0 || health.openPlatformTickets > 0 ? (
-        <Banner tone="info">
-          <div className="flex flex-row items-center gap-1.5">
-            <LifeBuoy size={13} color={colors.ink} />
-            <Text variant="caption">
-              {health.openSupportEscalations} open assistant escalation{health.openSupportEscalations === 1 ? "" : "s"} and {health.openPlatformTickets} open mailbox message
-              {health.openPlatformTickets === 1 ? "" : "s"} — see Support.
-            </Text>
-          </div>
-        </Banner>
-      ) : null}
+      <Card title="Flagged for review" icon={Flag} count={health.flaggedAuditEntries.length}>
+        {health.flaggedAuditEntries.length === 0 ? empty : (
+          <ul className="divide-y divide-hairline">
+            {health.flaggedAuditEntries.map((f) => (
+              <li key={f.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                <span className="font-mono text-xs text-ink">{f.actionType.replace(/_/g, " ")}</span>
+                <span className="text-xs text-muted-foreground">{f.companyName}</span>
+                <button
+                  type="button"
+                  onClick={() => act(`flag-${f.id}`, () => dismissAuditFlag(f.id))}
+                  disabled={busy === `flag-${f.id}`}
+                  className="ml-auto inline-flex items-center gap-1 rounded-lg border border-hairline px-2 py-1 text-xs font-medium text-ink hover:border-ink disabled:opacity-40"
+                >
+                  Dismiss, not a violation
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </Screen>
-  );
-}
-
-function MiniStat({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
-  return (
-    <div className="min-w-[140px] flex-1 rounded-xl border p-3" style={{ borderColor: danger ? "#FECACA" : colors.hairline, backgroundColor: danger ? "rgba(254,242,242,0.6)" : colors.card }}>
-      <Text variant="caption">{label}</Text>
-      <div className="mt-0.5 text-[20px] font-bold" style={{ color: danger ? colors.destructive : colors.ink }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function Section({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: ReactNode }) {
-  return (
-    <div>
-      <div className="mb-2 flex flex-row items-center gap-1.5">
-        <Icon size={14} color={colors.ink} />
-        <Text variant="heading">{title}</Text>
-      </div>
-      <Card>{children}</Card>
-    </div>
-  );
-}
-
-function Row({ left, right, first }: { left: string; right: string; first?: boolean }) {
-  return (
-    <div className={`flex flex-row items-center justify-between px-4 py-2.5 ${first ? "" : "border-t border-hairline/60"}`}>
-      <span className="flex-1 truncate text-[13px] text-ink">{left}</span>
-      <Text variant="caption">{right}</Text>
-    </div>
   );
 }

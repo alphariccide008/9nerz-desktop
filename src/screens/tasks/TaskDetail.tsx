@@ -20,7 +20,7 @@ import { Text } from "../../components/ui/Text";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
-import { StatusPill, PriorityBadge } from "../../components/ui/Badge";
+import { StatusPill } from "../../components/ui/Badge";
 import { Banner, Loading } from "../../components/ui/Feedback";
 import { KeyValueList, KeyValueRow } from "../../components/ui/KeyValue";
 import { Sheet } from "../../components/ui/Sheet";
@@ -157,7 +157,7 @@ export function TaskDetailContent({ taskId, onClose }: { taskId: string; onClose
 
       <div className="flex flex-row flex-wrap items-center gap-2">
         <StatusPill status={task.status} />
-        <PriorityBadge priority={task.priority} />
+        <span className="rounded border border-hairline px-1.5 py-0.5 text-[11px] text-muted-foreground">{task.priority}</span>
         {overdue ? (
           <div className="flex flex-row items-center gap-1 rounded-md bg-destructive px-1.5 py-0.5">
             <AlertTriangle size={11} color="#fff" />
@@ -241,7 +241,7 @@ export function TaskDetailContent({ taskId, onClose }: { taskId: string; onClose
         {isAssignee && task.status === "Pending" && !task.blockedComment ? (
           <>
             <Button title="Accept" size="sm" icon={<CheckCircle2 size={14} color="#fff" />} onPress={() => run(() => T.acceptTask(me.id, taskId), "Task accepted")} />
-            <Button title="Decline" size="sm" variant="outline" onPress={() => setPrompt({ kind: "decline", text: "" })} />
+            <Button title="Decline" size="sm" variant="outline" className="!border-red-300 !text-red-600 hover:!bg-red-50" onPress={() => setPrompt({ kind: "decline", text: "" })} />
           </>
         ) : null}
         {(isAssignee || isAssigner) && task.blockedComment && task.status === "Pending" ? (
@@ -250,19 +250,19 @@ export function TaskDetailContent({ taskId, onClose }: { taskId: string; onClose
         {isAssignee && task.status === "In Progress" ? (
           <>
             <Button title="Submit for review" size="sm" icon={<Send size={14} color="#fff" />} onPress={() => run(() => T.submitForReview(me.id, taskId), "Sent for review")} />
-            <Button title="Raise blocker" size="sm" variant="outline" onPress={() => setPrompt({ kind: "block", text: "" })} />
+            <Button title="Raise blocker" size="sm" variant="outline" className="!border-red-300 !text-red-600 hover:!bg-red-50" onPress={() => setPrompt({ kind: "block", text: "" })} />
           </>
         ) : null}
         {isReviewer && task.status === "Review" ? (
           <>
-            <Button title="Mark reviewed" size="sm" icon={<CheckCircle2 size={14} color="#fff" />} onPress={() => run(() => T.markReviewed(me.id, taskId), "Marked reviewed")} />
-            <Button title="Send back" size="sm" variant="destructive" onPress={() => setPrompt({ kind: "reviewerBlock", text: "" })} />
+            <Button title="Mark reviewed" size="sm" variant="ghost" className="!bg-emerald-600 !text-white hover:!bg-emerald-700" icon={<CheckCircle2 size={14} color="#fff" />} onPress={() => run(() => T.markReviewed(me.id, taskId), "Marked reviewed")} />
+            <Button title="Send back" size="sm" variant="outline" className="!border-red-300 !text-red-600 hover:!bg-red-50" onPress={() => setPrompt({ kind: "reviewerBlock", text: "" })} />
           </>
         ) : null}
         {isAssigner && task.status === "Review" ? (
           <>
-            <Button title="Approve" size="sm" icon={<CheckCircle2 size={14} color="#fff" />} onPress={() => run(() => T.approveTask(me.id, taskId), "Task approved")} />
-            <Button title="Request changes" size="sm" variant="outline" onPress={() => setPrompt({ kind: "revert", text: "" })} />
+            <Button title="Approve" size="sm" variant="ghost" className="!bg-emerald-600 !text-white hover:!bg-emerald-700" icon={<CheckCircle2 size={14} color="#fff" />} onPress={() => run(() => T.approveTask(me.id, taskId), "Task approved")} />
+            <Button title="Request changes" size="sm" variant="outline" className="!border-red-300 !text-red-600 hover:!bg-red-50" onPress={() => setPrompt({ kind: "revert", text: "" })} />
             {!task.reviewerId ? <Button title="Assign reviewer" size="sm" variant="ghost" onPress={() => setReviewerSheet(true)} /> : null}
           </>
         ) : null}

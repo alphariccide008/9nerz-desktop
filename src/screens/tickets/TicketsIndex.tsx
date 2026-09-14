@@ -8,8 +8,9 @@ import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/Feedback";
 import { useCurrentUser, useIsAdmin } from "../../lib/hooks";
 import { useDB } from "../../lib/db/store";
+import { useSession } from "../../lib/session";
 import { escalateOverdueTickets, listTickets, TicketListItem } from "../../lib/services/tickets";
-import { listMembers, listUnits } from "../../lib/services/org";
+import { listMembers, listUnits, fetchRealPlanStatus } from "../../lib/services/org";
 import { colors } from "../../lib/theme";
 import { cn } from "../../lib/cn";
 import { TicketDetailContent } from "./TicketDetail";
@@ -27,7 +28,10 @@ const STATUS_STYLE: Record<string, string> = {
   reopened: "bg-violet-100 text-violet-700",
 };
 const STATUS_LABEL: Record<string, string> = { open: "Open", in_progress: "In progress", resolved: "Resolved", reopened: "Reopened" };
-const PRIORITY_DOT: Record<string, string> = { Low: colors.hairline, Normal: "#38bdf8", High: colors.amber, Critical: colors.destructive };
+// Exact Tailwind palette hexes the real web app's tickets-view.tsx uses for
+// these dots (bg-slate-300 / bg-sky-400 / bg-amber-500 / bg-red-500) — not
+// the softer brand tones, which read too similar to each other at this size.
+const PRIORITY_DOT: Record<string, string> = { Low: "#cbd5e1", Normal: "#38bdf8", High: "#f59e0b", Critical: "#ef4444" };
 const STATUSES = ["open", "in_progress", "resolved", "reopened"];
 const PRIORITIES = ["Low", "Normal", "High", "Critical"];
 const PER_PAGE = 10;
@@ -37,6 +41,7 @@ const STATUS_RANK: Record<string, number> = { open: 0, reopened: 1, in_progress:
 type SortKey = "number" | "subject" | "created" | "priority" | "status";
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
 export default function TicketsIndex() {
   const me = useCurrentUser();
@@ -56,6 +61,13 @@ export default function TicketsIndex() {
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "number", dir: "desc" });
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
+  const { real } = useSession();
+  const [freePlan, setFreePlan] = useState(false);
+
+  useEffect(() => {
+    if (!real) return;
+    fetchRealPlanStatus().then((plan) => setFreePlan(plan?.tier === "free"));
+  }, [real]);
 
   useEffect(() => {
     if (!openId) return;
@@ -140,6 +152,18 @@ export default function TicketsIndex() {
         </div>
       </div>
 
+      {freePlan ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2.5 text-xs text-ink">
+          <span>
+            <Mail className="mr-1 inline h-3.5 w-3.5" />
+            Email-to-ticket is an Unlimited feature, inbound email won&apos;t create tickets on the Free plan. Existing tickets stay here and can still be worked.
+          </span>
+          <button type="button" onClick={() => navigate("/billing")} className="shrink-0 rounded-full bg-amber px-3 py-1 font-bold text-ink hover:brightness-95">
+            Upgrade
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex flex-row gap-1 border-b border-hairline">
         {TABS.map(([v, l]) => (
           <button key={v} type="button" onClick={() => setTab(v)} className={cn("-mb-px border-b-2 px-3 py-2 text-sm font-medium transition", tab === v ? "border-ink text-ink" : "border-transparent text-slate hover:text-ink")}>
@@ -218,7 +242,10 @@ export default function TicketsIndex() {
                   <td className="px-1 py-1.5">
                     <span className="block max-w-[20rem] truncate font-medium text-ink">{t.subject}</span>
                   </td>
-                  <td className="whitespace-nowrap px-1 py-1.5 text-muted-foreground">{fmtDate(t.createdAt)}</td>
+                  <td className="whitespace-nowrap px-1 py-1.5 text-muted-foreground">
+                    <span className="text-ink">{fmtDate(t.createdAt)}</span>
+                    <span className="ml-1.5 text-[11px]">{fmtTime(t.createdAt)}</span>
+                  </td>
                   <td className="px-1 py-1.5 text-muted-foreground">
                     <span className="block max-w-[9rem] truncate">{t.requesterName || t.requesterEmail}</span>
                   </td>

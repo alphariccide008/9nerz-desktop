@@ -40,7 +40,7 @@ export default function Reporting() {
 
   const Row = ({ n, depth }: { n: Node; depth: number }) => (
     <div>
-      <div className="flex flex-row items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-background" style={{ marginLeft: depth * 16 }}>
+      <div className="flex flex-row items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-background" style={{ marginLeft: depth * 14 }}>
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-ink">
           {n.firstName[0]}
           {n.lastName[0] || ""}

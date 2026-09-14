@@ -19,12 +19,14 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     setError(null);
     if (!org || !firstName || !lastName || !email || !password) return setError("Please fill out all fields.");
+    if (!agreed) return setError("Please accept the Terms of Service and Privacy Policy to continue.");
     const pw = validatePassword(password);
     if (!pw.valid) return setError(pw.message);
     if (password !== confirm) return setError("Passwords do not match.");
@@ -44,7 +46,6 @@ export default function Signup() {
       eyebrow="Get started"
       title="Create your organization"
       subtitle="You'll be the first admin. Add your structure and invite your team once you're in."
-      onBack={() => navigate("/welcome")}
       footer={
         <div className="flex flex-row gap-1">
           <Text variant="caption">Already have an account?</Text>
@@ -63,12 +64,11 @@ export default function Signup() {
         <Input containerClassName="flex-1" label="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" />
       </div>
       <Input
-        label="Work email"
+        label="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@company.com"
+        placeholder="you@example.com"
         icon={<Mail size={16} color={colors.mutedForeground} />}
-        hint="Consumer providers like Gmail or Yahoo aren't allowed."
       />
       <Input
         label="Password"
@@ -87,7 +87,40 @@ export default function Signup() {
         icon={<Lock size={16} color={colors.mutedForeground} />}
         onKeyDown={(e) => e.key === "Enter" && submit()}
       />
-      <Button title="Create organization" onPress={submit} loading={busy} fullWidth />
+      <label className="flex items-start gap-2.5 text-xs leading-relaxed text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-hairline text-ink"
+        />
+        <span>
+          I have read and agree to the{" "}
+          <button
+            type="button"
+            className="text-teal hover:underline"
+            onClick={() => window.nerz?.openExternal?.("https://www.9nerz.com/terms")}
+          >
+            Terms of Service
+          </button>{" "}
+          and{" "}
+          <button
+            type="button"
+            className="text-teal hover:underline"
+            onClick={() => window.nerz?.openExternal?.("https://www.9nerz.com/privacy")}
+          >
+            Privacy Policy
+          </button>
+          .
+        </span>
+      </label>
+      <Button
+        title={busy ? "Creating organization..." : "Create organization"}
+        onPress={submit}
+        loading={busy}
+        disabled={!agreed}
+        fullWidth
+      />
     </AuthScaffold>
   );
 }

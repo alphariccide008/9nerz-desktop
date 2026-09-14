@@ -77,13 +77,18 @@ ipcMain.handle("nerz:appVersion", () => app.getVersion());
 // there is no browser cookie jar to do it automatically.
 let pendingSignupCookie: string | null = null;
 
-type ApiRequest = { method: string; path: string; body?: unknown; token?: string | null };
+type ApiRequest = { method: string; path: string; body?: unknown; token?: string | null; cookie?: string | null };
 type ApiResult = { ok: boolean; status: number; data: unknown };
 
 ipcMain.handle("nerz:api", async (_e, req: ApiRequest): Promise<ApiResult> => {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (req.token) headers.Authorization = `Bearer ${req.token}`;
-  if (pendingSignupCookie) headers.Cookie = pendingSignupCookie;
+  // A handful of routes (billing) still run the web app's older cookie-session
+  // auth instead of the Bearer-JWT auth the rest of the API uses — desktop has
+  // no browser cookie jar to carry that automatically, so callers that need it
+  // (see lib/services/billing.ts) pass it explicitly per-request.
+  const cookies = [req.cookie, pendingSignupCookie].filter(Boolean).join("; ");
+  if (cookies) headers.Cookie = cookies;
 
   try {
     const res = await fetch(`${API_BASE}${req.path}`, {

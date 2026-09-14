@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 
 import { Screen } from "../../components/ui/Screen";
@@ -17,13 +17,15 @@ export default function SaCompanies() {
     tasks: (companyId: string) => db.tasks.filter((t) => t.companyId === companyId).length,
   }));
   const all = useMemo(() => listCompanies(), [tick]);
+  const [searchParams] = useSearchParams();
+  const initialStatus = searchParams.get("status");
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<"all" | "active" | "frozen">("all");
+  const [status, setStatus] = useState<"all" | "active" | "frozen">(initialStatus === "active" || initialStatus === "frozen" ? initialStatus : "all");
   const [tier, setTier] = useState<"all" | "free" | "paid">("all");
 
   const companies = all.filter((c) => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (status !== "all" && !(status === "frozen" ? c.status !== "active" : c.status === "active")) return false;
+    if (status !== "all" && c.status !== status) return false;
     if (tier !== "all" && c.tier !== tier) return false;
     return true;
   });
@@ -89,8 +91,8 @@ export default function SaCompanies() {
                   </td>
                   <td className="px-3 py-2.5 capitalize text-muted-foreground">{c.tier}</td>
                   <td className="px-3 py-2.5">
-                    {c.status !== "active" ? (
-                      <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[11px] font-semibold capitalize text-destructive">{c.status}</span>
+                    {c.status === "frozen" ? (
+                      <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[11px] font-semibold text-destructive">Frozen</span>
                     ) : (
                       <span className="rounded bg-teal/15 px-1.5 py-0.5 text-[11px] font-semibold text-teal">Active</span>
                     )}

@@ -6,12 +6,12 @@ import { useSession, RealUser, RealCompany } from "./session";
 import { Company, User } from "./db/schema";
 import { breakpoints, Breakpoint } from "./theme";
 
-/** A real account has no row in the local mock DB, so the rest of the app (which
- *  still reads `User`/`Company` shapes everywhere) gets a synthetic record built
- *  from the live profile. Fields the real API doesn't return (password, roleId,
- *  timestamps, …) get harmless placeholders — nothing reads them for a real
- *  account since the screens that do (Roles, People, …) are still local-mock-only
- *  and haven't been swapped to the real API yet. */
+/** Fallback for a real account before its first orgSync completes (or if it
+ *  never does): a synthetic record built from the live-login profile alone.
+ *  Fields the login response doesn't return (roleId, timestamps, …) get
+ *  harmless placeholders. Once orgSync has run, `useCurrentUser` prefers the
+ *  fully-synced row in `db.users` instead (real roleId, status, etc. — Roles,
+ *  People, Profile and others all read those fields for real accounts now). */
 function realUserToLocalShape(u: RealUser): User {
   const now = new Date().toISOString();
   return {
@@ -58,8 +58,9 @@ function realCompanyToLocalShape(c: RealCompany): Company {
 
 export function useCurrentUser(): User | null {
   const { userId, real } = useSession();
-  const mockUser = useDB((db) => db.users.find((u) => u.id === userId) ?? null);
-  return real ? realUserToLocalShape(real.user) : mockUser;
+  const dbUser = useDB((db) => db.users.find((u) => u.id === userId) ?? null);
+  if (real) return dbUser ?? realUserToLocalShape(real.user);
+  return dbUser;
 }
 
 export function useCompany(): Company | null {

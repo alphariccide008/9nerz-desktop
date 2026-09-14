@@ -15,7 +15,7 @@ import {
 } from "../db/schema";
 import { uid, nowISO, fullName } from "../util";
 import { apiRequest, ApiError } from "../api/http";
-import { getSession, getAccessToken } from "../session";
+import { getSession, getAccessToken, setRealSession } from "../session";
 import { syncRealOrgData } from "./orgSync";
 import {
   ServiceError,
@@ -69,7 +69,21 @@ export async function fetchRealPlanStatus(): Promise<RealPlanStatus | null> {
   const real = getSession().real;
   if (!real) return null;
   try {
-    const { plan } = await apiRequest<{ plan: RealPlanStatus }>("GET", "/api/org/me", undefined, getAccessToken());
+    const { plan, company } = await apiRequest<{ plan: RealPlanStatus; company: { id: string; name: string; slug: string; subscription_tier?: string; status?: string } | null }>(
+      "GET",
+      "/api/org/me",
+      undefined,
+      getAccessToken(),
+    );
+    // The login response doesn't always include company details (e.g. after a
+    // token refresh restores the session without re-fetching it) — backfill
+    // it here so the sidebar's company name has something to render.
+    if (company && (!real.company || real.company.name !== company.name)) {
+      await setRealSession({
+        ...real,
+        company: { id: company.id, name: company.name, slug: company.slug, status: company.status, subscriptionTier: company.subscription_tier },
+      });
+    }
     return plan;
   } catch {
     return null;

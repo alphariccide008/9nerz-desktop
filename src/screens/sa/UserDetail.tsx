@@ -19,7 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
 export default function SaUserDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const tick = useDB((db) => JSON.stringify(db.users.find((u) => u.id === id)));
+  const tick = useDB((db) => JSON.stringify(db.users.find((u) => u.id === id)) + db.userOrgUnits.length + db.tasks.length);
   const data = useMemo(() => {
     try {
       return id ? userDetail(id) : null;
@@ -34,15 +34,19 @@ export default function SaUserDetail() {
       <Loading />
     </Screen>
   );
-  const { user, company, role, assignedTasks, recentActivity } = data;
+  const { user, company, role, roleRank, reportsTo, invitedBy, units, directReports, assignedTasks, assignedTasksByStatus, assignedByThem, assignedByThemByStatus, recentActivity } = data;
+  const primaryUnit = units.find((u) => u.isPrimary) ?? units[0];
 
   const fields: [string, string][] = [
     ["Company", company?.name ?? "—"],
-    ["Role", role ?? "—"],
+    ["Role", role ? `${role}${roleRank != null ? ` (rank ${roleRank})` : ""}` : "—"],
+    ["Primary unit", primaryUnit?.name ?? "—"],
+    ["Reports to", reportsTo?.name ?? "—"],
+    ["Invited by", invitedBy?.name ?? "—"],
+    ["Invite accepted", user.inviteAcceptedAt ? shortDate(user.inviteAcceptedAt) : "—"],
     ["Joined", shortDate(user.createdAt)],
     ["Last login", user.lastLoginAt ? relativeTime(user.lastLoginAt) : "—"],
     ["Last active", user.lastActiveAt ? relativeTime(user.lastActiveAt) : "—"],
-    ["Assigned tasks", String(assignedTasks)],
   ];
 
   return (
@@ -83,6 +87,79 @@ export default function SaUserDetail() {
             <p className="text-sm font-medium text-ink">{val}</p>
           </div>
         ))}
+      </section>
+
+      {units.length > 0 ? (
+        <section className="rounded-xl border border-hairline bg-card p-4">
+          <p className="mb-2 text-sm font-semibold text-ink">Org units</p>
+          <div className="flex flex-wrap gap-2">
+            {units.map((u) => (
+              <span key={u.id} className="rounded-lg border border-hairline px-2 py-1 text-xs text-ink">
+                {u.name}
+                <span className="text-muted-foreground"> · {u.unitType}</span>
+                {u.isPrimary ? <span className="ml-1 text-[10px] font-semibold text-teal">PRIMARY</span> : null}
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="rounded-xl border border-hairline bg-card">
+        <header className="border-b border-hairline px-4 py-3">
+          <Text variant="heading">Tasks</Text>
+        </header>
+        <div className="grid gap-4 p-4 sm:grid-cols-2">
+          {(
+            [
+              ["Assigned to them", assignedTasks, assignedTasksByStatus],
+              ["Assigned by them", assignedByThem, assignedByThemByStatus],
+            ] as const
+          ).map(([label, total, byStatus]) => (
+            <div key={label}>
+              <p className="text-xs text-muted-foreground">
+                {label} · <span className="font-semibold text-ink">{total}</span>
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {Object.entries(byStatus)
+                  .filter(([, n]) => n > 0)
+                  .map(([s, n]) => (
+                    <span key={s} className="rounded bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                      {s}: <span className="font-semibold text-ink">{n}</span>
+                    </span>
+                  ))}
+                {total === 0 ? <span className="text-[11px] text-muted-foreground">None</span> : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-hairline bg-card">
+        <header className="border-b border-hairline px-4 py-3">
+          <Text variant="heading">Direct reports · {directReports.length}</Text>
+        </header>
+        <div className="divide-y divide-hairline">
+          {directReports.length === 0 ? (
+            <Text variant="caption" className="block px-4 py-6 text-center">
+              No direct reports.
+            </Text>
+          ) : (
+            directReports.map((r) => (
+              <div key={r.id} className="flex flex-row items-center justify-between gap-3 px-4 py-2.5">
+                <div className="min-w-0">
+                  <button type="button" onClick={() => navigate(`/sa/users/${r.id}`)} className="block truncate text-sm text-ink hover:underline">
+                    {r.name}
+                  </button>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {r.email}
+                    {r.role ? ` · ${r.role}` : ""}
+                  </p>
+                </div>
+                <span className="shrink-0 text-[11px] capitalize text-muted-foreground">{r.status}</span>
+              </div>
+            ))
+          )}
+        </div>
       </section>
 
       <section className="rounded-xl border border-hairline bg-card">

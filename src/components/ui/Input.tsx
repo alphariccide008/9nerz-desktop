@@ -23,7 +23,8 @@ export const Input = forwardRef<HTMLInputElement, FieldProps>(function Input(
       {label ? <Text variant="label">{label}</Text> : null}
       <div
         className={cn(
-          "flex flex-row items-center rounded-xl border bg-card px-3",
+          "flex h-9 flex-row items-center rounded-md border bg-card px-3 shadow-xs transition-[color,box-shadow]",
+          "focus-within:border-ink focus-within:ring-[3px] focus-within:ring-ink/20",
           error ? "border-destructive" : "border-hairline",
         )}
       >
@@ -32,7 +33,7 @@ export const Input = forwardRef<HTMLInputElement, FieldProps>(function Input(
           ref={ref}
           type={secure ? (hidden ? "password" : "text") : type ?? "text"}
           className={cn(
-            "flex-1 py-2.5 text-[14px] text-ink bg-transparent outline-none placeholder:text-muted-foreground",
+            "flex-1 text-[14px] text-ink bg-transparent outline-none placeholder:text-muted-foreground",
             className,
           )}
           {...props}
@@ -65,7 +66,8 @@ export function Textarea({
       {label ? <Text variant="label">{label}</Text> : null}
       <textarea
         className={cn(
-          "min-h-[88px] rounded-xl border bg-card px-3 py-2.5 text-[14px] text-ink outline-none placeholder:text-muted-foreground",
+          "min-h-[88px] rounded-md border bg-card px-3 py-2 text-[14px] text-ink shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground",
+          "focus:border-ink focus:ring-[3px] focus:ring-ink/20",
           error ? "border-destructive" : "border-hairline",
           className,
         )}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Clock, Mail, UserPlus, X } from "lucide-react";
+import { Clock, Mail, Trash2, UserPlus } from "lucide-react";
 
 import { Screen, PageHeader } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
@@ -18,9 +18,9 @@ import { shortDate } from "../../lib/util";
 import { colors } from "../../lib/theme";
 
 const STATUS_BADGE: Record<string, string> = {
-  active: "bg-teal/15 text-teal",
-  invited: "bg-amber/20 text-[#8a5a12]",
-  inactive: "bg-muted text-slate",
+  active: "bg-emerald-100 text-emerald-700",
+  invited: "bg-amber-100 text-amber-700",
+  inactive: "bg-gray-200 text-gray-600",
 };
 
 export default function People() {
@@ -52,14 +52,14 @@ export default function People() {
         <PageHeader title="People" subtitle="Invite people, set their role, unit and who they report to." right={<Button title="Invite" size="sm" icon={<UserPlus size={14} color={colors.white} />} onPress={() => setInviteOpen(true)} />} />
 
         {invites.length > 0 ? (
-          <div className="rounded-xl border border-amber/40 bg-amber/[0.06] p-3">
-            <Text variant="caption" className="mb-1.5 block font-semibold uppercase tracking-wide text-[#8a5a12]">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+            <Text variant="caption" className="mb-1.5 block font-semibold uppercase tracking-wide text-amber-700">
               Pending invites
             </Text>
             <div className="flex flex-col gap-1">
               {invites.map((iv) => (
                 <div key={iv.id} className="flex flex-row flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink">
-                  <Mail size={13} color="#8a5a12" />
+                  <Mail size={13} className="text-amber-600" />
                   {iv.email}
                   {iv.role ? <span className="text-xs text-muted-foreground">· {iv.role.name}</span> : null}
                   <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -73,9 +73,10 @@ export default function People() {
                         toast.show("Invite revoked", "success");
                       })
                     }
-                    className="ml-auto rounded-md border border-hairline bg-card px-2 py-1 text-[11px] font-medium text-slate hover:border-destructive hover:text-destructive"
+                    aria-label="Revoke invitation"
+                    className="ml-auto inline-flex items-center gap-1 rounded-md border border-hairline bg-card px-2 py-1 text-[11px] font-medium text-slate transition hover:border-destructive hover:text-destructive"
                   >
-                    <X size={12} />
+                    <Trash2 size={12} />
                   </button>
                 </div>
               ))}
@@ -152,7 +153,7 @@ export default function People() {
                   </td>
                   <td className="px-3 py-2">
                     {m.isCompanyAdmin ? (
-                      <Badge label={m.status} className={STATUS_BADGE[m.status]} />
+                      <Badge label={m.status} className={`capitalize ${STATUS_BADGE[m.status] || ""}`} textClassName={`capitalize ${STATUS_BADGE[m.status] || ""}`} />
                     ) : (
                       <select
                         value={m.status}

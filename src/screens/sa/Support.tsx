@@ -1,146 +1,71 @@
-import { useMemo, useState } from "react";
-import { CheckCircle2, HelpCircle, Mail, MailPlus } from "lucide-react";
+import { useMemo } from "react";
+import { Inbox } from "lucide-react";
 
-import { Screen, PageHeader } from "../../components/ui/Screen";
+import { Screen } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
-import { Sheet } from "../../components/ui/Sheet";
-import { Segmented } from "../../components/ui/Segmented";
-import { Badge } from "../../components/ui/Badge";
-import { EmptyState } from "../../components/ui/Feedback";
-import { useToast } from "../../components/ui/Toast";
 import { useDB } from "../../lib/db/store";
-import { listPlatformTickets, listSupportEscalations, resolvePlatformTicket, resolveSupportEscalation, simulatePlatformInbound } from "../../lib/services/superAdmin";
-import { relativeTime } from "../../lib/util";
-import { colors } from "../../lib/theme";
+import { listPlatformTickets } from "../../lib/services/superAdmin";
+
+const STATUS_STYLE: Record<string, string> = {
+  open: "bg-amber/20 text-[#8a5a12]",
+  resolved: "bg-teal/15 text-teal",
+};
 
 export default function SaSupport() {
-  const toast = useToast();
-  const [tab, setTab] = useState<"escalations" | "mailbox">("escalations");
-  const [statusFilter, setStatusFilter] = useState<"open" | "resolved">("open");
-  const [simOpen, setSimOpen] = useState(false);
-  const [sim, setSim] = useState({ fromEmail: "", fromName: "", subject: "", body: "" });
-  const tick = useDB((db) => db.supportEscalations.length + db.platformTickets.length + db.supportEscalations.map((e) => e.status).join(""));
-
-  const escalations = useMemo(() => listSupportEscalations(statusFilter), [tick, statusFilter]);
-  const mailbox = useMemo(() => listPlatformTickets(statusFilter), [tick, statusFilter]);
+  const tick = useDB((db) => db.platformTickets.length + db.platformTickets.map((t) => t.status).join(""));
+  const tickets = useMemo(() => listPlatformTickets(), [tick]);
 
   return (
     <Screen>
-      <PageHeader
-        title="Support"
-        subtitle="Questions the in-app assistant couldn't answer, plus support@9nerz.app."
-        right={tab === "mailbox" ? <Button title="Simulate inbound" size="sm" variant="outline" icon={<MailPlus size={14} color={colors.ink} />} onPress={() => setSimOpen(true)} /> : undefined}
-      />
+      <div>
+        <h1 className="flex items-center gap-2 font-display text-lg font-bold text-ink">
+          <Inbox className="h-5 w-5" /> 9nerz support inbox
+        </h1>
+        <Text variant="caption" className="mt-0.5 block max-w-2xl">
+          Connect the mailbox 9nerz customers write to. Mail to it becomes a ticket here and nowhere else. Each organisation's connected mailbox is isolated the same way.
+        </Text>
+      </div>
 
-      <Segmented
-        options={[
-          { value: "escalations", label: "Assistant escalations", badge: escalations.filter((e) => e.status === "open").length || undefined },
-          { value: "mailbox", label: "Platform mailbox", badge: mailbox.filter((t) => t.status === "open").length || undefined },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
-      <Segmented
-        options={[
-          { value: "open", label: "Open" },
-          { value: "resolved", label: "Resolved" },
-        ]}
-        value={statusFilter}
-        onChange={setStatusFilter}
-      />
-
-      {tab === "escalations" ? (
-        escalations.length === 0 ? (
-          <EmptyState icon={<HelpCircle size={22} color={colors.slate} />} title="Nothing here" />
+      <section className="rounded-xl border border-hairline bg-card">
+        <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
+          <span className="text-sm font-semibold text-ink">
+            Tickets <span className="text-muted-foreground">· {tickets.length}</span>
+          </span>
+        </header>
+        {tickets.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">No tickets yet. They appear here once the mailbox is connected and mail arrives.</p>
         ) : (
-          <Card>
-            {escalations.map((e, i) => (
-              <div key={e.id} className={`flex flex-col gap-1.5 px-4 py-3 ${i > 0 ? "border-t border-hairline/60" : ""}`}>
-                <div className="flex flex-row items-center justify-between">
-                  <span className="flex-1 text-[13px] font-medium text-ink">{e.question}</span>
-                  <Text variant="caption">{relativeTime(e.createdAt)}</Text>
-                </div>
-                <Text variant="caption">{e.companyName ?? "—"}</Text>
-                {e.status === "open" ? (
-                  <Button
-                    title="Mark resolved"
-                    size="sm"
-                    variant="outline"
-                    icon={<CheckCircle2 size={13} color={colors.ink} />}
-                    onPress={() => {
-                      resolveSupportEscalation(e.id);
-                      toast.show("Resolved", "success");
-                    }}
-                  />
-                ) : (
-                  <Badge label="resolved" className="self-start bg-teal/15" />
-                )}
-              </div>
-            ))}
-          </Card>
-        )
-      ) : mailbox.length === 0 ? (
-        <EmptyState icon={<Mail size={22} color={colors.slate} />} title="Nothing here" />
-      ) : (
-        <Card>
-          {mailbox.map((t, i) => (
-            <div key={t.id} className={`flex flex-col gap-1.5 px-4 py-3 ${i > 0 ? "border-t border-hairline/60" : ""}`}>
-              <div className="flex flex-row items-center justify-between">
-                <span className="flex-1 truncate text-[13px] font-medium text-ink">{t.subject}</span>
-                <Text variant="caption">{relativeTime(t.createdAt)}</Text>
-              </div>
-              <Text variant="caption">
-                {t.fromName ? `${t.fromName} · ` : ""}
-                {t.fromEmail}
-              </Text>
-              <div className="text-[13px] text-ink">{t.body}</div>
-              {t.status === "open" ? (
-                <Button
-                  title="Mark resolved"
-                  size="sm"
-                  variant="outline"
-                  icon={<CheckCircle2 size={13} color={colors.ink} />}
-                  onPress={() => {
-                    resolvePlatformTicket(t.id);
-                    toast.show("Resolved", "success");
-                  }}
-                />
-              ) : (
-                <Badge label="resolved" className="self-start bg-teal/15" />
-              )}
-            </div>
-          ))}
-        </Card>
-      )}
-
-      <Sheet
-        visible={simOpen}
-        onClose={() => setSimOpen(false)}
-        title="Simulate an inbound email"
-        footer={
-          <Button
-            title="Send"
-            fullWidth
-            disabled={!sim.fromEmail.trim() || !sim.subject.trim()}
-            onPress={() => {
-              simulatePlatformInbound(sim);
-              setSim({ fromEmail: "", fromName: "", subject: "", body: "" });
-              setSimOpen(false);
-              toast.show("Delivered to the platform mailbox", "success");
-            }}
-          />
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <Input label="From email" value={sim.fromEmail} onChange={(e) => setSim((s) => ({ ...s, fromEmail: e.target.value }))} />
-          <Input label="From name (optional)" value={sim.fromName} onChange={(e) => setSim((s) => ({ ...s, fromName: e.target.value }))} />
-          <Input label="Subject" value={sim.subject} onChange={(e) => setSim((s) => ({ ...s, subject: e.target.value }))} />
-          <Input label="Body" value={sim.body} onChange={(e) => setSim((s) => ({ ...s, body: e.target.value }))} />
-        </div>
-      </Sheet>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Subject</th>
+                  <th className="px-3 py-2 font-medium">From</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2 text-right font-medium">Last activity</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {tickets.map((t) => (
+                  <tr key={t.id} className="hover:bg-background">
+                    <td className="px-3 py-2">
+                      <span className="block max-w-[26rem] truncate font-medium text-ink">{t.subject}</span>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      <span className="block max-w-[14rem] truncate">{t.fromName || t.fromEmail}</span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold capitalize ${STATUS_STYLE[t.status] ?? ""}`}>{t.status}</span>
+                    </td>
+                    <td className="px-4 py-2 text-right text-[11px] text-muted-foreground">{new Date(t.resolvedAt || t.createdAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="border-t border-hairline px-4 py-2 text-[11px] text-muted-foreground">Read-only for now, replying from the Super Admin panel is coming next.</p>
+      </section>
     </Screen>
   );
 }

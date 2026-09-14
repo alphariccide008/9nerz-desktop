@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2, ListChecks, MessageSquare, ShieldAlert, Snowflake, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, Building2, ListChecks, MessageSquare, ShieldAlert, Snowflake, Users, type LucideIcon } from "lucide-react";
 
 import { Screen } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
@@ -20,10 +20,10 @@ export default function SaOverview() {
 
   const stats: { icon: LucideIcon; label: string; value: number | string; sub?: string; tone?: "warn" | "danger"; onPress?: () => void }[] = [
     { icon: Building2, label: "Companies", value: o.companies, sub: `${o.activeCompanies} active`, onPress: () => navigate("/sa/companies") },
-    { icon: Snowflake, label: "Frozen", value: o.frozenCompanies, tone: o.frozenCompanies ? "danger" : undefined },
-    { icon: TrendingUp, label: "Paid tier", value: o.paidCompanies, sub: `${o.companies - o.paidCompanies} on free` },
+    { icon: Snowflake, label: "Frozen", value: o.frozenCompanies, tone: o.frozenCompanies ? "danger" : undefined, onPress: () => navigate("/sa/companies?status=frozen") },
+    { icon: ArrowUpRight, label: "Paid tier", value: o.paidCompanies, sub: `${o.freeCompanies} on free` },
     { icon: Users, label: "Users", value: o.users },
-    { icon: ListChecks, label: "Open tickets", value: o.openTickets },
+    { icon: ListChecks, label: "Tasks", value: o.tasksTotal },
     { icon: MessageSquare, label: "Open chats", value: o.openChats, tone: o.openChats ? "warn" : undefined, onPress: () => navigate("/sa/chat") },
   ];
 
@@ -95,7 +95,7 @@ export default function SaOverview() {
                   <span className="min-w-0 truncate text-sm font-medium text-ink">{c.name}</span>
                   <span className="flex shrink-0 flex-row items-center gap-2 text-[11px] text-muted-foreground">
                     <span className="capitalize">{c.subscriptionTier}</span>
-                    {c.status !== "active" ? <span className={cn("rounded px-1.5 py-0.5 font-semibold", "bg-destructive/15 text-destructive")}>{c.status}</span> : null}
+                    {c.status === "frozen" ? <span className={cn("rounded px-1.5 py-0.5 font-semibold", "bg-destructive/15 text-destructive")}>Frozen</span> : null}
                     <span>{relativeTime(c.createdAt)}</span>
                   </span>
                 </button>

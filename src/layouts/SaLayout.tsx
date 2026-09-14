@@ -18,7 +18,7 @@ export default function SaLayout() {
 
   return (
     <div className="flex h-screen w-screen flex-row bg-background">
-      <div style={{ width: 248 }} className="shrink-0 border-r border-hairline">
+      <div style={{ width: 224 }} className="shrink-0">
         <SaSidebar />
       </div>
       <div className="min-w-0 flex-1">

@@ -36,7 +36,6 @@ export default function Login() {
       eyebrow="Sign in"
       title="Welcome back"
       subtitle="Enter your details to pick up where your team left off."
-      onBack={() => navigate("/welcome")}
       footer={
         <>
           <button type="button" onClick={() => navigate("/reset-password")}>
@@ -57,10 +56,10 @@ export default function Login() {
     >
       {error ? <Banner tone="error">{error}</Banner> : null}
       <Input
-        label="Work email"
+        label="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@company.com"
+        placeholder="you@example.com"
         icon={<Mail size={16} color={colors.mutedForeground} />}
       />
       <Input
@@ -72,7 +71,7 @@ export default function Login() {
         icon={<Lock size={16} color={colors.mutedForeground} />}
         onKeyDown={(e) => e.key === "Enter" && submit()}
       />
-      <Button title="Sign in" onPress={submit} loading={busy} fullWidth />
+      <Button title={busy ? "Signing in..." : "Sign in"} onPress={submit} loading={busy} fullWidth />
     </AuthScaffold>
   );
 }

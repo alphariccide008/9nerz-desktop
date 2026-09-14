@@ -35,7 +35,10 @@ export default function Roles() {
   return (
     <AdminGuard>
       <Screen>
-        <PageHeader title="Roles" subtitle="Each role has a rank (top = most senior) and a default 'reports to' role." />
+        <PageHeader
+          title="Roles"
+          subtitle={`Every role has a rank (top of the list = most senior) and a default "reports to" role that seeds new people's reporting lines.`}
+        />
 
         <div className="flex flex-row gap-2">
           <Input containerClassName="flex-1" value={name} onChange={(e) => setName(e.target.value)} placeholder="New role name (e.g. Team Lead)" onKeyDown={(e) => e.key === "Enter" && name.trim() && wrap(async () => { await createRole(me.id, name); setName(""); }, "Role added")} />

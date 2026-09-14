@@ -15,7 +15,9 @@ import { cn } from "../../lib/cn";
 
 export default function SaChat() {
   const tick = useDB((db) => db.chatMessages.length + JSON.stringify(db.chatConversations));
-  const convos = useMemo(() => listConversations(), [tick]);
+  const all = useMemo(() => listConversations(), [tick]);
+  const [filter, setFilter] = useState<"all" | "open" | "closed">("all");
+  const convos = useMemo(() => (filter === "all" ? all : all.filter((c) => c.status === filter)), [all, filter]);
   const [active, setActive] = useState<string | null>(convos[0]?.id ?? null);
   const [draft, setDraft] = useState("");
 
@@ -30,9 +32,21 @@ export default function SaChat() {
     <Screen maxWidth="none">
       <div className="flex flex-1 flex-row gap-3">
         <div className="w-56 shrink-0">
-          <Text variant="heading" className="mb-2 block">
-            Conversations
-          </Text>
+          <div className="mb-2 flex flex-row items-center justify-between">
+            <Text variant="heading">Conversations</Text>
+            <div className="flex flex-row gap-1">
+              {(["all", "open", "closed"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold capitalize", filter === f ? "bg-ink text-white" : "text-muted-foreground hover:bg-muted")}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
           <Card>
             {convos.length === 0 ? (
               <Text variant="caption" className="block p-4">

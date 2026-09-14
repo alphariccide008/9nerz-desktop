@@ -1,65 +1,93 @@
 import { useMemo, useState } from "react";
-import { Screen, PageHeader } from "../../components/ui/Screen";
+import { useSearchParams } from "react-router-dom";
+import { Screen } from "../../components/ui/Screen";
 import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
-import { Segmented } from "../../components/ui/Segmented";
-import { useDB } from "../../lib/db/store";
-import { crossCompanyAudit, saAuditLog } from "../../lib/services/superAdmin";
-import { relativeTime } from "../../lib/util";
+import { useDB, getDB } from "../../lib/db/store";
+import { crossCompanyAudit } from "../../lib/services/superAdmin";
 
 export default function SaAudit() {
-  const [tab, setTab] = useState<"platform" | "sa">("platform");
-  const [flagged, setFlagged] = useState(false);
-  const tick = useDB((db) => db.auditLogs.length + db.superAdminAuditLogs.length);
-  const rows = useMemo(() => crossCompanyAudit({ flaggedOnly: flagged }), [tick, flagged]);
-  const saRows = useMemo(() => saAuditLog(), [tick]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [actionType, setActionType] = useState("");
+  const [flagged, setFlagged] = useState(searchParams.get("flagged") === "1");
+  const companyId = searchParams.get("companyId");
+  const tick = useDB((db) => db.auditLogs.length);
+
+  const rows = useMemo(
+    () => crossCompanyAudit({ actionType: actionType || undefined, flaggedOnly: flagged }).filter((r) => !companyId || getDB().companies.find((c) => c.id === companyId)?.name === r.companyName),
+    [tick, flagged, actionType, companyId],
+  );
+  const actionTypes = useMemo(() => [...new Set(getDB().auditLogs.map((a) => a.actionType))].sort(), [tick]);
 
   return (
     <Screen>
-      <PageHeader title="Platform audit" subtitle="Cross-company log + the tamper-evident owner action log." />
-      <Segmented
-        options={[
-          { value: "platform", label: "Cross-company" },
-          { value: "sa", label: "Owner actions" },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
-
-      {tab === "platform" ? (
-        <>
-          <button type="button" onClick={() => setFlagged((f) => !f)} className="flex flex-row items-center gap-2 self-start">
-            <span className={`flex h-4 w-4 items-center justify-center rounded border ${flagged ? "border-ink bg-ink" : "border-hairline"}`}>{flagged ? <span className="text-[10px] font-bold text-white">✓</span> : null}</span>
-            <Text variant="caption">Flagged only</Text>
-          </button>
-          <Card>
-            {rows.map((r, i) => (
-              <div key={r.id} className={`flex flex-row items-center gap-3 px-4 py-2 ${i > 0 ? "border-t border-hairline/60" : ""}`}>
-                <span className={`h-2 w-2 rounded-full ${r.isFlagged ? "bg-destructive" : "bg-hairline"}`} />
-                <div className="flex-1">
-                  <div className="text-[12px] capitalize text-ink">{r.actionType.replace(/_/g, " ")}</div>
-                  <Text variant="caption">
-                    {r.companyName} · {r.actorType}
-                  </Text>
-                </div>
-                <Text variant="caption">{relativeTime(r.createdAt)}</Text>
-              </div>
+      <div className="flex flex-row flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-lg font-bold text-ink">Audit trail</h1>
+          <Text variant="caption">Every state-changing action across all companies. {rows.length} shown.</Text>
+        </div>
+        <div className="flex flex-row flex-wrap items-center gap-2">
+          {companyId ? (
+            <button
+              type="button"
+              onClick={() => setSearchParams((p) => { p.delete("companyId"); return p; })}
+              className="rounded-lg border border-hairline bg-card px-2 py-1.5 text-xs text-muted-foreground"
+            >
+              Company filter ✕
+            </button>
+          ) : null}
+          <select
+            value={actionType}
+            onChange={(e) => setActionType(e.target.value)}
+            className="rounded-lg border border-hairline bg-card px-2 py-1.5 text-sm text-ink outline-none focus:border-ink"
+          >
+            <option value="">All actions</option>
+            {actionTypes.map((a) => (
+              <option key={a} value={a}>
+                {a.replace(/_/g, " ")}
+              </option>
             ))}
-          </Card>
-        </>
-      ) : (
-        <Card>
-          {saRows.map((r, i) => (
-            <div key={r.id} className={`px-4 py-2.5 ${i > 0 ? "border-t border-hairline/60" : ""}`}>
-              <div className="flex flex-row items-center justify-between">
-                <span className="text-[12px] font-medium capitalize text-ink">{r.actionType.replace(/_/g, " ")}</span>
-                <Text variant="caption">{relativeTime(r.createdAt)}</Text>
-              </div>
-              <Text variant="caption">{r.details}</Text>
-            </div>
-          ))}
-        </Card>
-      )}
+          </select>
+          <label className="flex items-center gap-1.5 rounded-lg border border-hairline bg-card px-2.5 py-1.5 text-sm text-muted-foreground">
+            <input type="checkbox" checked={flagged} onChange={(e) => setFlagged(e.target.checked)} />
+            Flagged only
+          </label>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-hairline bg-card">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="border-b border-hairline text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+              <th className="px-4 py-2.5 font-medium">When</th>
+              <th className="px-3 py-2.5 font-medium">Company</th>
+              <th className="px-3 py-2.5 font-medium">Action</th>
+              <th className="px-3 py-2.5 font-medium">Entity</th>
+              <th className="px-3 py-2.5 font-medium">Actor</th>
+              <th className="px-4 py-2.5 font-medium">Flag</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-hairline">
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                  No audit entries yet.
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.id} className={r.isFlagged ? "bg-destructive/5" : "hover:bg-background"}>
+                  <td className="whitespace-nowrap px-4 py-2 text-[11px] text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-ink">{r.companyName}</td>
+                  <td className="px-3 py-2 capitalize text-ink">{r.actionType.replace(/_/g, " ")}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{r.entityType || "—"}</td>
+                  <td className="px-3 py-2 capitalize text-muted-foreground">{r.actorType}</td>
+                  <td className="px-4 py-2 text-[11px]">{r.isFlagged ? <span className="font-semibold text-destructive">⚑ flagged</span> : "—"}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </Screen>
   );
 }

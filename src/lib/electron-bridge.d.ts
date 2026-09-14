@@ -18,6 +18,7 @@ declare global {
           path: string,
           body?: unknown,
           token?: string | null,
+          cookie?: string | null,
         ): Promise<{ ok: boolean; status: number; data: unknown }>;
       };
     };

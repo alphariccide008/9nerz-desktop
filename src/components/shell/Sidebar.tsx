@@ -26,7 +26,7 @@ function Row({ item, active, badge }: { item: NavItem; active: boolean; badge?: 
     >
       <Icon size={17} color={active ? colors.ink : colors.slate} />
       <span className={cn("flex-1 truncate text-[13px]", active ? "font-semibold text-ink" : "text-slate")}>{item.label}</span>
-      {badge ? <span className="rounded-full bg-amber px-1.5 text-[10px] font-bold text-ink">{badge}</span> : null}
+      {badge ? <span className="rounded-full bg-amber px-1.5 text-[10px] font-bold text-ink">{badge > 9 ? "9+" : badge}</span> : null}
       {active ? <span className="h-4 w-1 rounded-full bg-amber" /> : null}
     </button>
   );

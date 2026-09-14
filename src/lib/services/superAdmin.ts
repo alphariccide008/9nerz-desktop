@@ -33,9 +33,11 @@ export interface Overview {
   companies: number;
   activeCompanies: number;
   frozenCompanies: number;
+  freeCompanies: number;
   users: number;
   paidCompanies: number;
   mrrNGN: number;
+  tasksTotal: number;
   openTickets: number;
   openChats: number;
 }
@@ -45,10 +47,12 @@ export function overview(): Overview {
   return {
     companies: db.companies.length,
     activeCompanies: db.companies.filter((c) => c.status === "active").length,
-    frozenCompanies: db.companies.filter((c) => c.status !== "active").length,
+    frozenCompanies: db.companies.filter((c) => c.status === "frozen").length,
+    freeCompanies: db.companies.filter((c) => c.subscriptionTier !== "paid").length,
     users: db.users.length,
     paidCompanies: db.companies.filter((c) => c.subscriptionTier === "paid").length,
     mrrNGN: db.subscriptions.filter((s) => s.tier === "paid" && s.status === "active").length * 45000,
+    tasksTotal: db.tasks.length,
     openTickets: db.tickets.filter((t) => t.status === "open" || t.status === "in_progress").length,
     openChats: db.chatConversations.filter((c) => c.status === "open").length,
   };
@@ -90,7 +94,9 @@ export function companyDetail(companyId: string) {
       .filter((u) => u.companyId === companyId)
       .map((u) => ({ id: u.id, name: fullName(u), email: u.email, status: u.status, isAdmin: u.isCompanyAdmin })),
     units: db.orgUnits.filter((u) => u.companyId === companyId).length,
+    roles: db.roles.filter((r) => r.companyId === companyId).length,
     tasks: db.tasks.filter((t) => t.companyId === companyId).length,
+    openTasks: db.tasks.filter((t) => t.companyId === companyId && t.status !== "Completed" && t.status !== "Approved").length,
     tickets: db.tickets.filter((t) => t.companyId === companyId).length,
     payments: db.payments.filter((p) => p.companyId === companyId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     audit: db.auditLogs.filter((a) => a.companyId === companyId).slice(0, 30),
@@ -101,11 +107,41 @@ export function userDetail(userId: string) {
   const db = getDB();
   const u = db.users.find((x) => x.id === userId);
   if (!u) throw new ServiceError("User not found", "not_found");
+  const namedRef = (id: string | null) => {
+    if (!id) return null;
+    const p = db.users.find((x) => x.id === id);
+    return p ? { id: p.id, name: fullName(p), email: p.email } : null;
+  };
+  const units = db.userOrgUnits
+    .filter((uo) => uo.userId === userId)
+    .map((uo) => {
+      const unit = db.orgUnits.find((o) => o.id === uo.orgUnitId);
+      return unit ? { id: unit.id, name: unit.name, unitType: unit.unitType, isPrimary: uo.isPrimary } : null;
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null);
+  const byStatus = (tasks: { status: string }[]) => {
+    const acc: Record<string, number> = {};
+    for (const t of tasks) acc[t.status] = (acc[t.status] ?? 0) + 1;
+    return acc;
+  };
+  const assignedTasks = db.tasks.filter((t) => t.assigneeId === userId);
+  const assignedByThem = db.tasks.filter((t) => t.assignerId === userId);
+  const directReports = db.users
+    .filter((x) => x.reportsToUserId === userId)
+    .map((x) => ({ id: x.id, name: fullName(x), email: x.email, status: x.status, role: db.roles.find((r) => r.id === x.roleId)?.name ?? null }));
   return {
     user: u,
     company: db.companies.find((c) => c.id === u.companyId) ?? null,
     role: db.roles.find((r) => r.id === u.roleId)?.name ?? null,
-    assignedTasks: db.tasks.filter((t) => t.assigneeId === userId).length,
+    roleRank: db.roles.find((r) => r.id === u.roleId)?.rank ?? null,
+    reportsTo: namedRef(u.reportsToUserId),
+    invitedBy: namedRef(u.invitedBy),
+    units,
+    directReports,
+    assignedTasks: assignedTasks.length,
+    assignedTasksByStatus: byStatus(assignedTasks),
+    assignedByThem: assignedByThem.length,
+    assignedByThemByStatus: byStatus(assignedByThem),
     recentActivity: db.auditLogs.filter((a) => a.actorId === userId).slice(0, 20),
   };
 }
@@ -170,12 +206,29 @@ export function listAllPayments() {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** Local mirror of PATCH /api/super-admin/payments/[id] — marks a pending payment reviewed. */
+export function setPaymentStatus(paymentId: string, status: "success" | "failed"): void {
+  const saId = getSession().superAdminId;
+  mutate((d) => {
+    const payment = d.payments.find((p) => p.id === paymentId);
+    if (!payment) return;
+    d.payments = d.payments.map((p) => (p.id === paymentId ? { ...p, status } : p));
+    writeSuperAdminAudit(d, {
+      superAdminId: saId,
+      actionType: "payment_reviewed",
+      targetCompanyId: payment.companyId,
+      details: `Payment ${payment.invoiceNumber ?? payment.id} marked ${status}`,
+    });
+  });
+}
+
 export function listAllSubscriptions() {
   const db = getDB();
   return db.subscriptions
     .map((s) => ({ ...s, companyName: db.companies.find((c) => c.id === s.companyId)?.name ?? "—" }))
     .sort((a, b) => a.companyName.localeCompare(b.companyName));
 }
+
 
 export function crossCompanyAudit(filter?: { actionType?: string; flaggedOnly?: boolean }) {
   const db = getDB();
@@ -192,6 +245,22 @@ export function crossCompanyAudit(filter?: { actionType?: string; flaggedOnly?: 
       isFlagged: a.isFlagged,
       createdAt: a.createdAt,
     }));
+}
+
+/** Local mirror of PATCH /api/super-admin/audit/[id] — dismisses a flagged entry as not a violation. */
+export function dismissAuditFlag(auditLogId: string, note?: string): void {
+  const saId = getSession().superAdminId;
+  mutate((d) => {
+    const log = d.auditLogs.find((a) => a.id === auditLogId);
+    if (!log) return;
+    d.auditLogs = d.auditLogs.map((a) => (a.id === auditLogId ? { ...a, isFlagged: false } : a));
+    writeSuperAdminAudit(d, {
+      superAdminId: saId,
+      actionType: "audit_flag_dismissed",
+      targetCompanyId: log.companyId,
+      details: note ?? "Dismissed on the Operations page",
+    });
+  });
 }
 
 export function saAuditLog() {
@@ -317,7 +386,11 @@ export function listSupportEscalations(status?: "open" | "resolved") {
   const db = getDB();
   return db.supportEscalations
     .filter((e) => !status || e.status === status)
-    .map((e) => ({ ...e, companyName: e.companyId ? db.companies.find((c) => c.id === e.companyId)?.name ?? "—" : null }))
+    .map((e) => ({
+      ...e,
+      companyName: e.companyId ? db.companies.find((c) => c.id === e.companyId)?.name ?? "—" : null,
+      requesterName: e.userId ? (() => { const u = db.users.find((x) => x.id === e.userId); return u ? fullName(u) : null; })() : null,
+    }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 

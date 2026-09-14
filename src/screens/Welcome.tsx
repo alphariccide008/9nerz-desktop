@@ -12,47 +12,48 @@ const CAPABILITIES = [
   { icon: Inbox, title: "Email becomes a tracked ticket", body: "Point a support address at 9nerz. Inbound mail lands in the right department's queue, ready to assign." },
 ];
 
-const SLIDES = [
+/** Ported from the real web app's components/marketing/hero.tsx TiltBoard — a static
+ *  3-column kanban preview (framer-motion tilt/drag dropped, not worth the extra
+ *  dependency for a launch screen, but the content and layout match exactly). */
+const BOARD_LISTS = [
   {
-    title: "Customer Service · board",
-    badge: "4 active",
-    rows: [
-      { status: "In Progress", dot: colors.ink, tag: "Design", t: "Billboard artwork — Lekki", who: "Chidi Eze" },
-      { status: "Review", dot: colors.teal, tag: "Finance", t: "Monthly revenue report", who: "Bode Cole" },
-      { status: "Pending", dot: colors.amber, tag: "Marketing", t: "Draft Q3 campaign brief", who: "Dara Ali" },
-      { status: "Pending", dot: colors.amber, tag: "Legal", t: "Vendor contract review", who: "Hauwa Sani" },
+    name: "To do",
+    dot: colors.amber,
+    cards: [
+      { t: "Draft Q3 campaign brief", tag: "Marketing" },
+      { t: "Vendor contract review", tag: "Legal" },
+      { t: "Refresh onboarding deck", tag: "People" },
     ],
   },
   {
-    title: "Support · tickets",
-    badge: "3 open",
-    rows: [
-      { status: "Open", dot: colors.amber, tag: "9TC-004", t: "Refund for order #4821", who: "jane@customer.com" },
-      { status: "In progress", dot: colors.ink, tag: "9TC-005", t: "App crashes on checkout", who: "sam@shop.io" },
-      { status: "Open", dot: colors.amber, tag: "9TC-006", t: "Partnership enquiry", who: "biz@partner.co" },
+    name: "In progress",
+    dot: colors.ink,
+    cards: [
+      { t: "Billboard artwork · Lekki", tag: "Design" },
+      { t: "Monthly revenue report", tag: "Finance" },
     ],
   },
   {
-    title: "Engineering · reporting line",
-    badge: "6 people",
-    rows: [
-      { status: "Manager", dot: colors.teal, tag: "Rank 3", t: "Fola Bello", who: "reports to Gani Musa" },
-      { status: "Associate", dot: colors.slate, tag: "Rank 5", t: "Hauwa Sani", who: "reports to Fola Bello" },
-      { status: "Head", dot: colors.ink, tag: "Rank 2", t: "Gani Musa", who: "reports to Ada Obi" },
+    name: "Review",
+    dot: colors.teal,
+    cards: [
+      { t: "Client proposal · new account", tag: "Sales" },
+      { t: "Website copy pass", tag: "Content" },
     ],
   },
 ];
 
+const ROTATING = ["from anywhere", "before it slips", "as a team", "with clarity"];
+
 export default function Welcome() {
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
-  const [slide, setSlide] = useState(0);
+  const [rot, setRot] = useState(0);
   useEffect(() => setMounted(true), []);
   useEffect(() => {
-    const id = setInterval(() => setSlide((s) => (s + 1) % SLIDES.length), 4000);
+    const id = setInterval(() => setRot((r) => (r + 1) % ROTATING.length), 2600);
     return () => clearInterval(id);
   }, []);
-  const active = SLIDES[slide];
 
   return (
     <div className="h-screen w-screen overflow-y-auto bg-background">
@@ -78,15 +79,19 @@ export default function Welcome() {
               Org-structure · Tasks · Ticketing
             </span>
 
-            <h1 className="mt-5 font-display text-[2.6rem] font-extrabold leading-[1.08] tracking-tight lg:text-[3.6rem]">
-              Your organization,
-              <br />
-              on one board.
+            <h1 className="mt-5 font-display text-[2.05rem] font-extrabold leading-[1.1] tracking-tight lg:text-[4rem] lg:leading-[1.05]">
+              Move work from request to done
+              <span className="mt-1 block h-[1.2em] overflow-hidden text-amber lg:mt-2">
+                <span key={rot} style={{ animation: "slide-fade-in 0.4s ease-out" }} className="block">
+                  {ROTATING[rot]}
+                </span>
+              </span>
             </h1>
 
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/75">
-              9nerz is task and ticket management built on your org chart. Define your own departments, roles and
-              reporting lines — every board, route and report follows them.
+              9nerz is task and ticket management built on your org chart. Define your own
+              departments, roles and reporting lines. Then every board, route and report
+              follows them.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -95,7 +100,7 @@ export default function Welcome() {
                 onClick={() => navigate("/signup")}
                 className="group inline-flex items-center justify-center gap-2 rounded-xl bg-amber px-6 py-3.5 text-sm font-bold text-ink shadow-lg transition-all hover:brightness-105 active:scale-[0.98]"
               >
-                Create your organization
+                Start free
                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
               </button>
               <button
@@ -107,33 +112,38 @@ export default function Welcome() {
               </button>
             </div>
 
-            <p className="mt-6 text-[11px] text-white/55">No credit card · self-host option</p>
+            <p className="mt-6 text-xs leading-tight text-white/70">
+              <span className="font-bold text-white">10 days of Unlimited, free</span>
+              <br />
+              no credit card · $80/mo locked for the first 200
+            </p>
           </div>
 
           <div
             className="w-full min-w-0 transition-all duration-700 ease-out lg:pl-2"
             style={{ opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0) scale(1)" : "translateY(24px) scale(0.97)" }}
           >
-            <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-card shadow-2xl">
-              <div key={slide} style={{ animation: "slide-fade-in 0.5s ease-out" }}>
-                <div className="flex flex-row items-center justify-between border-b border-hairline px-4 py-3">
-                  <span className="text-sm font-bold text-ink">{active.title}</span>
-                  <span className="rounded-full bg-teal/15 px-2 py-0.5 text-[10px] font-bold text-teal">{active.badge}</span>
-                </div>
-                <div className="divide-y divide-hairline/70">
-                  {active.rows.map((t) => (
-                    <div key={t.t} className="flex flex-row items-center gap-3 px-4 py-3">
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: t.dot }} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium text-ink">{t.t}</p>
-                        <p className="truncate text-[11px] text-muted-foreground">
-                          {t.tag} · {t.who}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-slate">{t.status}</span>
+            <div className="relative rounded-2xl border border-white/15 bg-white/10 p-3 shadow-2xl backdrop-blur-sm sm:p-4">
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {BOARD_LISTS.map((list) => (
+                  <div key={list.name} className="w-48 shrink-0 rounded-xl bg-card p-2.5 shadow-sm lg:w-56">
+                    <div className="mb-2.5 flex flex-row items-center gap-2 px-1">
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: list.dot }} />
+                      <span className="text-xs font-bold text-ink">{list.name}</span>
+                      <span className="ml-auto text-[10px] font-semibold text-muted-foreground">{list.cards.length}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="space-y-2">
+                      {list.cards.map((c) => (
+                        <div key={c.t} className="rounded-lg border border-hairline bg-background p-2.5 shadow-xs">
+                          <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate">
+                            {c.tag}
+                          </span>
+                          <p className="mt-1.5 text-[11px] font-medium leading-snug text-ink">{c.t}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

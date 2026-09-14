@@ -2,6 +2,8 @@
 
 import { getDB } from "../db/store";
 import { fullName } from "../util";
+import { apiRequest } from "../api/http";
+import { getSession, getAccessToken } from "../session";
 
 export interface AuditView {
   id: string;
@@ -52,4 +54,28 @@ export function taskAudit(taskId: string): AuditView[] {
   const companyId = db.tasks.find((t) => t.id === taskId)?.companyId;
   if (!companyId) return [];
   return listAudit(companyId, { entityType: "task", entityId: taskId }).reverse();
+}
+
+type RealAuditEntry = { id: string; action_type: string; entity_type: string | null; actor_name: string; is_flagged: boolean; created_at: string };
+
+/** Real accounts read GET /api/org/audit directly — admin-only, company-scoped,
+ *  already sorted newest-first server-side. Not synced into the local mock
+ *  audit table since nothing else in the app reads audit data cross-screen. */
+export async function fetchRealAudit(): Promise<AuditView[] | null> {
+  if (!getSession().real) return null;
+  try {
+    const data = await apiRequest<{ entries: RealAuditEntry[] }>("GET", "/api/org/audit", undefined, getAccessToken());
+    return data.entries.map((e) => ({
+      id: e.id,
+      actionType: e.action_type,
+      actorName: e.actor_name,
+      entityType: e.entity_type,
+      entityId: null,
+      createdAt: e.created_at,
+      isFlagged: e.is_flagged,
+      flagReason: null,
+    }));
+  } catch {
+    return null;
+  }
 }
